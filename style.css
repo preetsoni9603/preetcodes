@@ -59,8 +59,8 @@
   .eyebrow-line{ font-family:var(--mono); font-size:13px; color:var(--indigo-soft); margin:0 0 22px; display:flex; align-items:center; gap:10px; }
   .eyebrow-line::before{ content:""; width:22px; height:1px; background:var(--indigo-soft); display:inline-block; }
   h1.name{
-    font-family:var(--serif); font-weight:600; font-size:clamp(42px,5.4vw,64px);
-    line-height:1.04; margin:0 0 22px; letter-spacing:-0.01em;
+    font-family:var(--serif); font-weight:600; font-size:clamp(40px,5vw,58px);
+    line-height:1.1; margin:0 0 20px; letter-spacing:-0.01em;
   }
   h1.name .accent{ font-style:italic; color:var(--indigo-soft); }
   .role{ font-size:18px; color:var(--text-dark-soft); max-width:46ch; margin:0 0 34px; }
@@ -133,6 +133,52 @@
   .project-links a{ text-decoration:none; color:var(--indigo-soft); }
   .project-links a:hover{ text-decoration:underline; }
 
+  .exp-list{ position:relative; padding-left:32px; }
+  .exp-list::before{
+    content:""; position:absolute; left:6px; top:6px; bottom:6px; width:2px;
+    background:linear-gradient(180deg, var(--indigo), var(--coral) 60%, transparent);
+  }
+  .exp-item{
+    position:relative;
+    padding:0 0 40px 28px;
+  }
+  .exp-item:last-child{ padding-bottom:0; }
+  .exp-item::before{
+    content:""; position:absolute; left:-32px; top:4px; width:14px; height:14px;
+    border-radius:50%; background:var(--cream); border:3px solid var(--indigo); z-index:1;
+  }
+  .exp-item.current::before{ border-color:var(--coral); box-shadow:0 0 0 4px rgba(255,107,74,0.15); }
+  .exp-card{
+    background:var(--paper); border:1px solid var(--cream-line); border-radius:14px;
+    padding:26px 28px; transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  .exp-card:hover{ transform:translateX(4px); box-shadow:0 18px 34px -20px rgba(23,25,26,0.25); border-color:var(--indigo-soft); }
+  .exp-top-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:4px; }
+  .exp-dates{
+    font-family:var(--mono); font-size:12px; color:var(--indigo);
+    background:rgba(108,99,255,0.1); padding:4px 11px; border-radius:100px; white-space:nowrap;
+  }
+  .exp-role{ font-family:var(--serif); font-size:20px; font-weight:600; margin:0 0 2px; }
+  .exp-org{ font-size:14px; color:var(--text-light-soft); font-weight:500; margin:0 0 14px; }
+  .exp-bullets{ margin:0; padding-left:18px; color:var(--text-light-soft); font-size:14.5px; line-height:1.75; }
+  .exp-bullets li{ margin-bottom:6px; }
+  .exp-bullets li::marker{ color:var(--indigo); }
+
+  .cert-list{ list-style:none; padding:0; margin:0; display:grid; gap:10px; }
+  .cert-list li{
+    font-size:15px; color:var(--text-light-soft); padding:14px 18px;
+    background:var(--paper); border:1px solid var(--cream-line); border-radius:10px;
+  }
+  .cert-list b{ color:var(--text-light); font-weight:600; }
+
+  .edu-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:20px; }
+  .edu-card{
+    background:var(--paper); border:1px solid var(--cream-line); border-radius:12px; padding:22px 24px;
+  }
+  .edu-card .edu-degree{ font-family:var(--serif); font-size:18px; font-weight:600; margin:0 0 4px; }
+  .edu-card .edu-school{ font-size:14px; color:var(--text-light-soft); margin:0 0 8px; }
+  .edu-card .edu-dates{ font-family:var(--mono); font-size:12px; color:var(--indigo); margin:0; }
+
   .courses-list{ border-top:1px solid var(--cream-line); }
   .course{
     display:grid; grid-template-columns:110px 1fr auto; gap:20px; align-items:center;
@@ -176,6 +222,7 @@
     .project-card.featured{ grid-column:span 1; }
     .course{ grid-template-columns:1fr; gap:6px; }
     .course-badge{ justify-self:flex-start; }
+    .edu-grid{ grid-template-columns:1fr; }
   }
   @media (max-width: 520px){
     .navlinks{ display:none; }

@@ -1,7 +1,7 @@
 <footer id="contact">
   <div class="wrap">
     <h2 class="section-title">Let's talk</h2>
-    <p class="contact-lead">Have a project idea in mind, or any suggestions? My inbox is always open.</p>
+    <p class="contact-lead">Any suggestions? Or want to discuss project ideas? Feel free to contact me — email or phone.</p>
     <div class="contact-row">
       <a href="mailto:preetsoni969@gmail.com">preetsoni969@gmail.com</a>
       <a href="mailto:preet.admin@preetcodes.com">preet.admin@preetcodes.com</a>
