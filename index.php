@@ -8,7 +8,7 @@
     </div>
     <div class="skills-wrap">
       <div class="skills-intro">
-        <p>The tools I reach for most, sharpened through real projects rather than tutorials. Comfortable across the stack, from pixel-level UI to the database.</p>
+        <p>The tools I reach for most,............ sharpened through real projects rather than tutorials. Comfortable across the stack, from pixel-level UI to the database.</p>
       </div>
       <div class="skills-grid">
         <div class="skill-card"><b>Java</b><div class="bar"><i style="width:90%"></i></div></div>
