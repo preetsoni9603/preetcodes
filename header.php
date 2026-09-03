@@ -30,7 +30,7 @@
       <h1 class="name">Preet Soni</h1>
       <p class="role">Full-stack developer with hands-on experience across React.js, Java, PHP/MySQL, and WordPress — progressing from Web Developer Intern to Department Director Intern within eight months by taking on team leadership and cross-project coordination. Comfortable working across the stack, from REST API integration and data visualization to UI implementation and QA, in fast-moving, cross-functional teams. Currently seeking a full-time or internship role as a web developer.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="/resume.pdf" download>Download résumé</a>
+        <a class="btn btn-primary" href="/Preet%20resume.pdf" download>Download résumé</a>
         <a class="btn btn-ghost" href="#projects">View projects</a>
       </div>
     </div>
