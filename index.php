@@ -215,7 +215,7 @@
         <h3>Want the full picture?</h3>
         <p>Full experience, education, and skills in one page — updated for 2026.</p>
       </div>
-      <a class="btn btn-primary" href="/Preet%20Resume.pdf" download>Download résumé</a>
+      <a class="btn btn-primary" href="/Preet%20Resume.pdf" download>Download resume</a>
     </div>
   </div>
 </section>
