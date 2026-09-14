@@ -228,8 +228,10 @@
   .foot-note{ margin-top:56px; padding-top:24px; border-top:1px solid var(--ink-line); font-size:12px; color:var(--text-dark-soft); font-family:var(--mono); }
 
   @media (max-width: 860px){
+    .hero{ padding-top:40px; }
     .hero .wrap{ grid-template-columns:1fr; }
     .code-card, .photo-card{ transform:none; order:-1; justify-self:center; }
+    .photo-card{ width:100%; max-width:340px; height:auto; aspect-ratio:4/5; margin:0 auto 32px; }
     .skills-wrap{ grid-template-columns:1fr; }
     .skills-grid{ grid-template-columns:repeat(2,1fr); }
     .projects-grid{ grid-template-columns:1fr; }
