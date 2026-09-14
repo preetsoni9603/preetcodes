@@ -230,8 +230,8 @@
   @media (max-width: 860px){
     .hero{ padding-top:40px; }
     .hero .wrap{ grid-template-columns:1fr; }
-    .code-card, .photo-card{ transform:none; order:-1; justify-self:center; }
-    .photo-card{ width:100%; max-width:340px; height:auto; aspect-ratio:4/5; margin:0 auto 32px; }
+    .code-card{ transform:none; order:-1; justify-self:center; }
+    .photo-card{ width:100%; max-width:340px; height:auto; aspect-ratio:4/5; justify-self:start; margin:32px 0 0; }
     .skills-wrap{ grid-template-columns:1fr; }
     .skills-grid{ grid-template-columns:repeat(2,1fr); }
     .projects-grid{ grid-template-columns:1fr; }
