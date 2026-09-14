@@ -12,7 +12,7 @@
 
 <nav>
   <div class="wrap">
-    <a class="logo" href="#top">preet<em>.codes</em></a>
+    <a class="logo" href="#top">Preet<em> Soni</em></a>
     <ul class="navlinks">
       <li><a href="#skills">Skills</a></li>
       <li><a href="#experience">Experience</a></li>
@@ -26,29 +26,16 @@
 <header class="hero" id="top">
   <div class="wrap">
     <div>
-      <p class="eyebrow-line">full stack software developer</p>
+      <p class="eyebrow-line">Full stack software developer</p>
       <h1 class="name">Preet Soni</h1>
-      <p class="role">Full-stack developer with hands-on experience across React.js, Java, PHP/MySQL, and WordPress — progressing from Web Developer Intern to Department Director Intern within eight months by taking on team leadership and cross-project coordination. Comfortable working across the stack, from REST API integration and data visualization to UI implementation and QA, in fast-moving, cross-functional teams. Currently seeking a full-time or internship role as a web developer.</p>
+      <p class="role">I'm a full-stack developer who builds both web applications and Windows desktop applications, with a solid foundation across React.js, Java, PHP/MySQL, and WordPress. What sets my work apart is hands-on experience at the intersection of software development and AI — I've worked directly on training AI agents as part of the development process, giving me practical, real-world insight into how AI can be woven into modern engineering workflows. From writing clean, maintainable code to leveraging AI for faster debugging, smarter testing, and more efficient problem-solving, I bring an AI-augmented approach to every project I build. I'm driven by a passion for creating reliable, well-crafted software — and by staying ahead of the curve as AI reshapes how developers work.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="/Preet%20resume.pdf" download>Download résumé</a>
+        <a class="btn btn-primary" href="/Preet%20Resume.pdf" download> Download Resume</a>
         <a class="btn btn-ghost" href="#projects">View projects</a>
       </div>
     </div>
-    <div class="code-card">
-      <div class="code-head"><span></span><span></span><span></span></div>
-      <div class="code-body">
-<span class="c">// about.js</span><br>
-<span class="k">const</span> preet = {<br>
-&nbsp;&nbsp;role: <span class="s">"Full Stack Software Developer"</span>,<br>
-&nbsp;&nbsp;stack: {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;frontend: [<span class="s">"React"</span>, <span class="s">"HTML"</span>, <span class="s">"CSS"</span>],<br>
-&nbsp;&nbsp;&nbsp;&nbsp;backend: [<span class="s">"Java"</span>, <span class="s">"PHP"</span>, <span class="s">"Python"</span>],<br>
-&nbsp;&nbsp;&nbsp;&nbsp;data: [<span class="s">"MySQL"</span>, <span class="s">"REST API"</span>]<br>
-&nbsp;&nbsp;},<br>
-&nbsp;&nbsp;based: <span class="s">"St. Louis, MO"</span>,<br>
-&nbsp;&nbsp;<span class="p">available</span>: <span class="k">true</span><br>
-};
-      </div>
+    <div class="photo-card">
+      <img src="assets/profile.jpg" alt="Preet Soni — Full-Stack Developer" loading="eager">
     </div>
   </div>
 </header>

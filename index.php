@@ -4,7 +4,7 @@
   <div class="wrap">
     <div class="section-head">
       <h2 class="section-title">Skills</h2>
-      <span class="section-note">stack.json</span>
+      
     </div>
     <div class="skills-wrap">
       <div class="skills-intro">
@@ -30,7 +30,7 @@
   <div class="wrap">
     <div class="section-head">
       <h2 class="section-title">Experience</h2>
-      <span class="section-note">work.log</span>
+     
     </div>
     <div class="exp-list">
 
@@ -213,9 +213,9 @@
     <div class="resume-card">
       <div>
         <h3>Want the full picture?</h3>
-        <p>Full experience, education, and skills in one page — updated for 2026.</p>
+        <p>Full experience, education, and skills in one page</p>
       </div>
-      <a class="btn btn-primary" href="/Preet%20Resume.pdf" download>Download resume</a>
+      <a class="btn btn-primary" href="/Preet%20Resume.pdf" download>Download Resume</a>
     </div>
   </div>
 </section>
