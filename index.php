@@ -121,10 +121,21 @@
     </div>
     <div class="projects-grid">
 
-      <div class="project-card featured" style="--card-glow: var(--indigo);">
+      <div class="project-card featured" style="--card-glow: var(--coral);">
+        <div class="project-top">
+          <h3 class="project-title">Office Ease — Office Management System</h3>
+          <span class="project-num">01</span>
+        </div>
+        <p class="project-desc">An all-in-one office management platform centralizing task tracking, scheduling, and team engagement in one place.</p>
+        <div class="project-bottom">
+          <span class="ongoing-badge"><i class="status-dot"></i>Ongoing</span>
+        </div>
+      </div>
+
+      <div class="project-card" style="--card-glow: var(--indigo);">
         <div class="project-top">
           <h3 class="project-title">Trend-Fx — Financial Data Dashboard</h3>
-          <span class="project-num">01</span>
+          <span class="project-num">02</span>
         </div>
         <p class="project-desc">A financial data visualization tool with React.js frontend features and UI enhancements. Integrated REST APIs with Recharts to render live, interactive data visualizations, and managed sprint planning and task tracking in Trello.</p>
         <div class="project-bottom">
@@ -138,7 +149,7 @@
       <div class="project-card" style="--card-glow: var(--coral);">
         <div class="project-top">
           <h3 class="project-title">E-Learning Website</h3>
-          <span class="project-num">02</span>
+          <span class="project-num">03</span>
         </div>
         <p class="project-desc">Backend integration and content management features for a functioning e-learning platform, with page layouts designed alongside a developer team to improve site functionality and usability.</p>
         <div class="project-bottom">
@@ -152,7 +163,7 @@
       <div class="project-card" style="--card-glow: var(--indigo-soft);">
         <div class="project-top">
           <h3 class="project-title">Java Quiz Application</h3>
-          <span class="project-num">03</span>
+          <span class="project-num">04</span>
         </div>
         <p class="project-desc">A desktop quiz application with login/registration, score tracking, and results display, built with an interactive Swing-based GUI to streamline the user experience.</p>
         <div class="project-bottom">
@@ -166,7 +177,7 @@
       <div class="project-card" style="--card-glow: var(--coral);">
         <div class="project-top">
           <h3 class="project-title">2D Java Game</h3>
-          <span class="project-num">04</span>
+          <span class="project-num">05</span>
         </div>
         <p class="project-desc">A 2D game with player movement, creature AI, and map interaction using object-oriented design, with collision handling and reusable component architecture for improved gameplay mechanics.</p>
         <div class="project-bottom">

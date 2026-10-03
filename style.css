@@ -94,7 +94,6 @@
     width:420px; height:560px;
     background:var(--ink-2); border:1px solid var(--ink-line); border-radius:14px;
     box-shadow:0 30px 60px -20px rgba(0,0,0,0.6);
-    
     justify-self:center;
   }
   .photo-card:hover{ transform:rotate(0deg); transition:transform .3s ease; }
@@ -230,8 +229,8 @@
   @media (max-width: 860px){
     .hero{ padding-top:40px; }
     .hero .wrap{ grid-template-columns:1fr; }
-    .code-card{ transform:none; order:-1; justify-self:center; }
-    .photo-card{ width:100%; max-width:340px; height:auto; aspect-ratio:4/5; justify-self:start; margin:32px 0 0; }
+    .code-card, .photo-card{ transform:none; order:-1; justify-self:center; }
+    .photo-card{ width:100%; max-width:340px; height:auto; aspect-ratio:4/5; margin:0 auto 32px; }
     .skills-wrap{ grid-template-columns:1fr; }
     .skills-grid{ grid-template-columns:repeat(2,1fr); }
     .projects-grid{ grid-template-columns:1fr; }
