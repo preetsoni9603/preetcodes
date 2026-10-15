@@ -202,6 +202,13 @@
         <div class="actions"><button type="button" class="btn sm" id="set-export">Export backup</button>
         <label class="btn sm" for="set-import" style="cursor:pointer">Import backup</label><input id="set-import" type="file" accept="application/json,.json" hidden>
         <button type="button" class="btn sm danger" id="set-clear">Erase all data</button></div></div>
+      ${window.BACKSTOCK_LOCK ? `<div class="field"><span class="label">Password</span>
+        <span class="hint">Changing it signs out every other device.</span>
+        <input id="pw-cur" type="password" autocomplete="current-password" placeholder="Current password" aria-label="Current password">
+        <input id="pw-new" type="password" autocomplete="new-password" placeholder="New password (8+ characters)" aria-label="New password">
+        <input id="pw-new2" type="password" autocomplete="new-password" placeholder="Type the new password again" aria-label="Confirm new password">
+        <div class="actions"><button type="button" class="btn sm" id="pw-save">Change password</button>
+        <button type="button" class="btn sm" id="pw-lock">Lock app now</button></div></div>` : ""}
       <span class="status" id="set-msg"></span>
       <div class="actions" style="justify-content:flex-end"><button type="button" class="btn" id="set-cancel">Cancel</button><button type="submit" class="btn primary">Save</button></div>
     </form></div>`;
@@ -227,6 +234,28 @@
         persist(); location.reload();
       } catch (err) { msg("That file isn't a Backstock backup.", true); }
     };
+    const pwSave = document.getElementById("pw-save");
+    if (pwSave) {
+      pwSave.onclick = async () => {
+        const cur = document.getElementById("pw-cur").value, nw = document.getElementById("pw-new").value, nw2 = document.getElementById("pw-new2").value;
+        if (!cur || !nw) { msg("Fill in your current and new password.", true); return; }
+        if (nw.length < 8) { msg("New password must be at least 8 characters.", true); return; }
+        if (nw !== nw2) { msg("The two new passwords don't match.", true); return; }
+        pwSave.disabled = true; msg("Saving…");
+        try {
+          const body = new URLSearchParams({ current: cur, new: nw });
+          const r = await fetch("./?action=change", { method: "POST", body, credentials: "same-origin" });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && j.ok) { ["pw-cur", "pw-new", "pw-new2"].forEach(id => document.getElementById(id).value = ""); msg("Password changed."); }
+          else msg(j.error || "Couldn't change the password. Try again.", true);
+        } catch (e) { msg("Couldn't reach the server. Check your connection.", true); }
+        pwSave.disabled = false;
+      };
+      document.getElementById("pw-lock").onclick = () => {
+        const f = document.createElement("form"); f.method = "post"; f.action = "./?action=logout";
+        document.body.appendChild(f); f.submit();
+      };
+    }
     const clr = document.getElementById("set-clear");
     clr.onclick = () => {
       if (clr.dataset.armed !== "1") { clr.dataset.armed = "1"; clr.textContent = "Tap again to erase everything"; return; }

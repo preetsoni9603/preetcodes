@@ -204,6 +204,7 @@ function showTab(t) {
   $$("section.panel").forEach(p => p.hidden = p.dataset.panel !== t);
   if (t === "reports") renderReports();
   if (t === "activity") renderLog();
+  if (window.matchMedia("(max-width:640px)").matches) window.scrollTo(0, 0);
 }
 $$(".tab").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
 
@@ -286,9 +287,9 @@ function renderStock() {
       <td><span class="item-name">${esc(i.name)}</span>${statusPill(i.qty)}${grouped ? "" : `<div><span class="dept">${esc(i.dept)}</span></div>`}</td>
       <td class="q">${fmtN(i.qty)}</td>
       <td class="when hide-sm">${ago(i.updatedAt)}</td>
-      <td style="text-align:right;width:1%">${canWrite ? `<button class="btn sm" data-edit="${esc(i.id)}">Edit</button>` : ""}</td></tr>`;
+      <td class="edit-col" style="text-align:right;width:1%">${canWrite ? `<button class="btn sm" data-edit="${esc(i.id)}">Edit</button>` : ""}</td></tr>`;
   }
-  wrap.innerHTML = `<table><thead><tr><th>Item</th><th class="q">On hand</th><th class="hide-sm">Updated</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  wrap.innerHTML = `<table><thead><tr><th>Item</th><th class="q">On hand</th><th class="hide-sm">Updated</th><th class="edit-col"></th></tr></thead><tbody>${rows}</tbody></table>`;
   if (canWrite) wrap.querySelectorAll("tr[data-id]").forEach(tr => tr.addEventListener("click", () => openEdit(tr.dataset.id)));
 }
 
@@ -759,7 +760,7 @@ function renderAll() {
 function applyWriteGate() {
   $("#ro-banner").hidden = canWrite || !db;
   $$(".w-only").forEach(e => e.hidden = !canWrite);
-  ["receive", "shelf"].forEach(t => { const b = document.querySelector(`.tab[data-tab="${t}"]`); b.hidden = !canWrite; });
+  ["receive", "shelf"].forEach(t => document.querySelectorAll(`.tab[data-tab="${t}"]`).forEach(b => b.hidden = !canWrite));
   if (!canWrite && (ui.tab === "receive" || ui.tab === "shelf")) showTab("stock");
 }
 

@@ -20,13 +20,25 @@ No build step, no server, no database to set up. It's plain HTML, CSS and JavaSc
 - **Activity** – the last 40 deliveries, shelf pulls and edits.
 - **Backup** – export / import all data as a JSON file from Settings (gear icon).
 
+## Password
+
+The app is protected by a password checked **on the server** (PHP), so the app page doesn't load until the right password is entered.
+
+- Needs a host that runs PHP 7.4+ (cPanel hosting does). It will not work on GitHub Pages.
+- Only a one-way hash of the password is in the code, never the password itself.
+- **Change it:** Settings (gear icon) → Password. This signs out every other device.
+- **Lock now:** Settings → Lock app now.
+- "Keep me signed in" lasts 30 days; otherwise 12 hours.
+- 8 wrong tries from one connection pauses login for 15 minutes.
+- The new password and a signing key are saved in `~/.backstock-auth.json` (outside the public folder), or `.auth.json` in this folder if that isn't possible. **Forgot the password?** Delete that file in cPanel's File Manager and the starting password works again.
+
 ## Run it
 
-Open `index.html` in a browser, or serve the folder:
+Upload the folder to a PHP host, or test locally with PHP:
 
 ```bash
 # any static server works, for example:
-python3 -m http.server 8000
+php -S localhost:8000
 # then visit http://localhost:8000
 ```
 
@@ -61,7 +73,9 @@ Without a key, typed lists are still read line by line (`name, department, qty` 
 ## Project structure
 
 ```
-index.html          page layout
+index.php           password check, then loads the app
+views/login.php     password screen
+views/app.php       app page layout
 css/styles.css      styles (light and dark theme)
 js/app.js           app logic: stock, receiving, shelf, reports, activity
 js/standalone.js    storage (localStorage), Anthropic API calls, PDF download, settings

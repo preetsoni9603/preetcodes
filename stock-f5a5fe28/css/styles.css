@@ -200,3 +200,80 @@ img{max-width:100%}
 .gear{appearance:none;width:42px;height:42px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
 .gear:hover{color:var(--ink);border-color:var(--muted)}
 .gear svg{width:20px;height:20px}
+
+/* Review table: stack each row on phones */
+@media (max-width:640px){
+  .review table,.review tbody{display:block}
+  .review thead{display:none}
+  .review tr{display:grid;grid-template-columns:minmax(0,1fr) 84px 34px;gap:6px 8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .review tr:last-child{border-bottom:0}
+  .review td{display:block;padding:0!important;border:0;min-width:0!important;width:auto!important}
+  .review td:first-child{grid-column:1 / -1}
+  .review td:last-child{grid-column:3;grid-row:2}
+  .review td.st{grid-column:1 / -1;grid-row:3}
+  .review td input{min-width:0!important}
+}
+
+/* ---------- Phone-first layout ---------- */
+.bnav{display:none}
+@media (max-width:640px){
+  body{font-size:16px}
+  input,select,textarea,button{font-size:16px}
+  header .hrow{gap:10px;padding-block:10px}
+  .brand h1{font-size:22px}
+  .search{order:3;flex:1 1 100%;max-width:none}
+  .search input{height:46px}
+  nav.tabs{display:none}
+  .bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);
+    padding:6px max(6px,env(safe-area-inset-left,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-right,0px));gap:2px;
+    box-shadow:0 -4px 16px rgb(0 0 0 / .06)}
+  .btab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 2px;min-height:56px;
+    border:0;border-radius:10px;background:none;color:var(--muted);font-family:var(--f-display);font-weight:600;font-size:12px;letter-spacing:.01em;white-space:nowrap}
+  .btab svg{width:24px;height:24px}
+  .btab span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .btab[aria-selected="true"]{color:var(--ink);background:var(--accent-soft)}
+  .btab[aria-selected="true"] svg{color:var(--ink)}
+  main{padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  section.panel{gap:14px}
+  .panel-head{flex-direction:column;align-items:stretch;gap:12px}
+  .panel-head h2{font-size:22px}
+  .panel-head p{font-size:15px}
+  .toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .toolbar select{min-width:0;width:100%}
+  .toolbar .btn{width:100%}
+  .toolbar .btn:only-child{grid-column:1 / -1}
+  .btn{height:48px}
+  .btn.sm{height:42px}
+  .icon-btn{width:42px;height:42px}
+  .seg{display:flex;width:100%}
+  .seg button{flex:1;padding:10px 6px;font-size:15px}
+  .card.pad{padding:14px}
+  .actions .btn.primary{flex:1 1 auto}
+  .frow,.colhead{grid-template-columns:minmax(0,1fr) 80px 42px}
+  .frow.shelf,.colhead.shelf{grid-template-columns:minmax(0,1fr) 80px 42px}
+  .frow input,.frow select{min-height:46px}
+  textarea{min-height:200px;font-size:16px}
+  /* stock list: tap the row to edit */
+  #stock-wrap .edit-col{display:none}
+  #stock-wrap td{padding:14px 12px}
+  #stock-wrap td.q{font-size:22px}
+  #stock-wrap tr[data-id]:active{background:var(--sunk)}
+  .hit .big{font-size:36px}
+  .stats{grid-template-columns:1fr 1fr;gap:8px}
+  .stats .stat:first-child{grid-column:1 / -1}
+  .stat .v{font-size:22px}
+  .dept-grid{grid-template-columns:1fr}
+  .log summary{padding:14px}
+  /* pop-ups slide up from the bottom */
+  .scrim{padding:0;align-items:flex-end}
+  .modal{max-width:none;border-radius:18px 18px 0 0;padding:20px max(16px,env(safe-area-inset-left,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px));max-height:92vh}
+  .modal::before{content:"";align-self:center;width:40px;height:4px;border-radius:2px;background:var(--line);margin-top:-8px}
+  .modal .actions{flex-wrap:wrap}
+  .modal .actions .btn{flex:1 1 auto}
+  .drop{padding:36px 16px}
+}
+@media (prefers-reduced-motion:no-preference) and (max-width:640px){
+  .modal{animation:sheet-up .22s ease-out}
+  @keyframes sheet-up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+}
