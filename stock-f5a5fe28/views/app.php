@@ -35,7 +35,7 @@
 
 <main class="wrap">
   <div class="banner" id="ro-banner" hidden>You can view this inventory but not change it. Ask the owner for edit access.</div>
-  <div class="banner" id="offline-banner" hidden>Inventory storage isn't available in this view. Open the page in Claude while signed in to load and save stock.</div>
+  <div class="banner" id="offline-banner" hidden>Couldn't load your inventory from the website. Check your internet connection and reload the page.</div>
 
   <!-- STOCK -->
   <section class="panel" id="p-stock" data-panel="stock">

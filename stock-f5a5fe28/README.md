@@ -20,6 +20,14 @@ No build step, no server, no database to set up. It's plain HTML, CSS and JavaSc
 - **Activity** – the last 40 deliveries, shelf pulls and edits.
 - **Backup** – export / import all data as a JSON file from Settings (gear icon).
 
+## Same inventory on every device
+
+Inventory is stored **on your web server**, not in the browser. Sign in with the same password on your phone, tablet or computer and you see the same stock. Changes made on one device show up on the others within a few seconds.
+
+- Data file: `~/.backstock-data.json` (outside the public folder), or `.data.json` in this folder if that isn't possible (blocked from the web by `.htaccess`).
+- Download a copy any time from **Settings → Export backup**.
+- The AI API key is also saved on the server, so you enter it once and it works on every device. AI requests go through your server, so the key never reaches the browser.
+
 ## Password
 
 The app is protected by a password checked **on the server** (PHP), so the app page doesn't load until the right password is entered.
@@ -49,13 +57,9 @@ php -S localhost:8000
 3. Under **Build and deployment**, choose **Deploy from a branch**, pick `main` and `/ (root)`, and save.
 4. Your app will be live at `https://<your-username>.github.io/<repo-name>/` in a minute or two.
 
-## Where data is stored
+## Hosting without PHP
 
-Inventory is saved in **your browser's local storage** on the device you use. That means:
-
-- It survives page reloads and closing the browser.
-- It is **not** shared between devices or browsers automatically. Use **Settings → Export backup** and **Import backup** to move it.
-- Clearing your browser's site data erases it, so export a backup now and then.
+On static hosting (for example GitHub Pages), `index.php` can't run, so there is no password and no shared storage. To use it that way, rename `views/app.php` to `index.html`, delete its first line (the `<?php ... ?>` guard) and the `window.BACKSTOCK_LOCK` line; data is then kept in each browser.
 
 ## AI reading of photos and lists (optional)
 

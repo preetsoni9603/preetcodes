@@ -11,6 +11,10 @@
  *   /home/<you>/.backstock-auth.json   (fallback: .auth.json in this folder,
  *   which .htaccess blocks from the web)
  * Delete that file to go back to the starting password.
+ *
+ * Inventory data is saved on the server in /home/<you>/.backstock-data.json
+ * (fallback: .data.json in this folder, blocked from the web), so every device
+ * you sign in on sees the same stock.
  */
 declare(strict_types=1);
 
@@ -125,6 +129,63 @@ function json_out(int $code, array $body): void {
 }
 function go_home(): void { header('Location: ' . cookie_path(), true, 303); exit; }
 
+/* ---------- shared inventory data ---------- */
+const DATA_COLLS = ['items', 'depts', 'log'];
+const MAX_LOG    = 500;
+function data_path(): string {
+    $home = dirname((string)($_SERVER['DOCUMENT_ROOT'] ?? ''));
+    $outside = $home . '/.backstock-data.json';
+    if ($home !== '' && $home !== '.' && $home !== '/' && (is_file($outside) || is_writable($home))) return $outside;
+    return __DIR__ . '/.data.json';
+}
+function empty_data(): array { return ['rev' => 0, 'items' => [], 'depts' => [], 'log' => []]; }
+function clean_data($d): array {
+    $out = empty_data();
+    if (!is_array($d)) return $out;
+    $out['rev'] = (int)($d['rev'] ?? 0);
+    foreach (DATA_COLLS as $c) {
+        if (!isset($d[$c]) || !is_array($d[$c])) continue;
+        foreach ($d[$c] as $id => $doc) if (valid_id((string)$id) && is_array($doc)) $out[$c][(string)$id] = $doc;
+    }
+    return $out;
+}
+function valid_id(string $id): bool { return (bool)preg_match('/^[A-Za-z0-9_\-.~:@+]{1,80}$/', $id); }
+function read_data(): array {
+    $p = data_path();
+    if (!is_file($p)) return empty_data();
+    $fh = @fopen($p, 'r'); if (!$fh) return empty_data();
+    flock($fh, LOCK_SH); $raw = stream_get_contents($fh); flock($fh, LOCK_UN); fclose($fh);
+    return clean_data(json_decode((string)$raw, true));
+}
+/** Lock, change, save. $fn receives the data by reference; return a string to abort with that error. */
+function change_data(callable $fn): array {
+    $p = data_path();
+    $fh = @fopen($p, 'c+');
+    if (!$fh) json_out(500, ['ok' => false, 'code' => 'unavailable', 'error' => 'The server would not let the app save data.']);
+    flock($fh, LOCK_EX);
+    $d = clean_data(json_decode((string)stream_get_contents($fh), true));
+    $err = $fn($d);
+    if (is_string($err)) { flock($fh, LOCK_UN); fclose($fh); json_out(400, ['ok' => false, 'code' => 'invalid_argument', 'error' => $err]); }
+    if (count($d['log']) > MAX_LOG) {
+        uasort($d['log'], fn($a, $b) => ($b['at'] ?? 0) <=> ($a['at'] ?? 0));
+        $d['log'] = array_slice($d['log'], 0, MAX_LOG, true);
+    }
+    $d['rev']++;
+    $json = json_encode($d, JSON_UNESCAPED_UNICODE);
+    ftruncate($fh, 0); rewind($fh); fwrite($fh, $json); fflush($fh);
+    flock($fh, LOCK_UN); fclose($fh);
+    @chmod($p, 0600);
+    return $d;
+}
+function read_json_body(int $maxBytes): array {
+    $raw = file_get_contents('php://input', false, null, 0, $maxBytes + 1);
+    if ($raw === false || strlen($raw) > $maxBytes) json_out(413, ['ok' => false, 'code' => 'too_large', 'error' => 'That request is too large.']);
+    $j = json_decode($raw, true);
+    if (!is_array($j)) json_out(400, ['ok' => false, 'code' => 'invalid_argument', 'error' => 'Bad request.']);
+    return $j;
+}
+function key_hint(string $k): string { return $k === '' ? '' : '…' . substr($k, -4); }
+
 /* ---------- requests ---------- */
 $auth   = load_auth();
 $action = (string)($_GET['action'] ?? '');
@@ -143,6 +204,96 @@ if ($action === 'change' && $method === 'POST') {
     if (!persist($auth)) json_out(500, ['ok' => false, 'error' => 'Could not save the new password. Try again.']);
     set_login_cookie($auth, true); // other devices are signed out; this one stays in
     json_out(200, ['ok' => true]);
+}
+
+/* ---------- app API (signed-in only) ---------- */
+$api = ['data', 'write', 'import', 'settings', 'ai'];
+if (in_array($action, $api, true)) {
+    if (!is_logged_in($auth)) json_out(401, ['ok' => false, 'code' => 'signed_out', 'error' => 'Signed out.']);
+    if ($method === 'POST' && ($_SERVER['HTTP_X_BACKSTOCK'] ?? '') !== '1') json_out(403, ['ok' => false, 'code' => 'forbidden', 'error' => 'Forbidden.']);
+
+    if ($action === 'data') {
+        $d = read_data();
+        if (isset($_GET['since']) && (int)$_GET['since'] === $d['rev']) json_out(200, ['ok' => true, 'rev' => $d['rev'], 'unchanged' => true]);
+        json_out(200, ['ok' => true] + $d);
+    }
+
+    if ($action === 'write' && $method === 'POST') {
+        $in = read_json_body(2 * 1024 * 1024);
+        $ops = $in['ops'] ?? null;
+        if (!is_array($ops) || !$ops || count($ops) > 300) json_out(400, ['ok' => false, 'code' => 'invalid_argument', 'error' => 'Bad request.']);
+        $d = change_data(function (array &$d) use ($ops) {
+            foreach ($ops as $o) {
+                $op = $o['op'] ?? ''; $c = $o['coll'] ?? ''; $id = (string)($o['id'] ?? '');
+                if (!in_array($c, DATA_COLLS, true) || !valid_id($id)) return 'Bad item reference.';
+                if ($op === 'delete') { unset($d[$c][$id]); continue; }
+                $doc = $o['data'] ?? null;
+                if (!is_array($doc) || strlen(json_encode($doc)) > 65536) return 'Bad item data.';
+                if ($op === 'set') $d[$c][$id] = $doc;
+                elseif ($op === 'update') {
+                    if (!isset($d[$c][$id])) return 'That item no longer exists. Reload and try again.';
+                    $d[$c][$id] = array_merge($d[$c][$id], $doc);
+                } else return 'Bad operation.';
+            }
+            return null;
+        });
+        json_out(200, ['ok' => true, 'rev' => $d['rev']]);
+    }
+
+    if ($action === 'import' && $method === 'POST') {
+        $in = read_json_body(8 * 1024 * 1024);
+        $src = clean_data($in['data'] ?? []);
+        $d = change_data(function (array &$d) use ($src) {
+            foreach (DATA_COLLS as $c) $d[$c] = $src[$c];
+            return null;
+        });
+        json_out(200, ['ok' => true, 'rev' => $d['rev']]);
+    }
+
+    if ($action === 'settings') {
+        if ($method === 'POST') {
+            $in = read_json_body(16384);
+            if (!empty($in['clearKey'])) $auth['apiKey'] = '';
+            elseif (isset($in['apiKey']) && trim((string)$in['apiKey']) !== '') $auth['apiKey'] = trim((string)$in['apiKey']);
+            if (isset($in['model']) && preg_match('/^[a-z0-9.\-]{3,64}$/', (string)$in['model'])) $auth['model'] = (string)$in['model'];
+            if (!persist($auth)) json_out(500, ['ok' => false, 'code' => 'unavailable', 'error' => 'Could not save settings on the server.']);
+        }
+        $k = (string)($auth['apiKey'] ?? '');
+        json_out(200, ['ok' => true, 'hasKey' => $k !== '', 'keyHint' => key_hint($k), 'model' => (string)($auth['model'] ?? 'claude-sonnet-5-5')]);
+    }
+
+    if ($action === 'ai' && $method === 'POST') {
+        $key = (string)($auth['apiKey'] ?? '');
+        if ($key === '') json_out(400, ['ok' => false, 'code' => 'not_granted', 'error' => 'No API key saved.']);
+        if (!function_exists('curl_init')) json_out(500, ['ok' => false, 'code' => 'upstream_error', 'error' => 'PHP cURL is not available on this server.']);
+        $in = read_json_body(14 * 1024 * 1024);
+        $prompt = (string)($in['prompt'] ?? '');
+        $images = is_array($in['images'] ?? null) ? $in['images'] : [];
+        if ($prompt === '' || strlen($prompt) > 200000 || count($images) > 5) json_out(400, ['ok' => false, 'code' => 'invalid_request', 'error' => 'Bad request.']);
+        $content = [];
+        foreach ($images as $b64) {
+            if (!is_string($b64) || strlen($b64) > 6000000 || !preg_match('/^[A-Za-z0-9+\/=]+$/', $b64)) json_out(400, ['ok' => false, 'code' => 'image_rejected', 'error' => 'Bad image.']);
+            $content[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/jpeg', 'data' => $b64]];
+        }
+        $content[] = ['type' => 'text', 'text' => $prompt];
+        @set_time_limit(150);
+        $ch = curl_init('https://api.anthropic.com/v1/messages');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 140, CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_HTTPHEADER => ['content-type: application/json', 'x-api-key: ' . $key, 'anthropic-version: 2023-06-01'],
+            CURLOPT_POSTFIELDS => json_encode(['model' => (string)($auth['model'] ?? 'claude-sonnet-5-5'), 'max_tokens' => 4096, 'messages' => [['role' => 'user', 'content' => $content]]]),
+        ]);
+        $res = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        if ($res === false) json_out(502, ['ok' => false, 'code' => 'network', 'error' => 'Could not reach the Anthropic API.']);
+        if ($status === 401 || $status === 403) json_out(400, ['ok' => false, 'code' => 'bad_key', 'error' => 'API key rejected.']);
+        if ($status === 429) json_out(429, ['ok' => false, 'code' => 'rate_limited', 'error' => 'Rate limited.']);
+        $j = json_decode((string)$res, true);
+        if ($status !== 200 || !is_array($j)) json_out(502, ['ok' => false, 'code' => 'upstream_error', 'error' => 'The AI service returned an error.']);
+        $text = '';
+        foreach (($j['content'] ?? []) as $b) if (($b['type'] ?? '') === 'text') $text .= (string)$b['text'];
+        json_out(200, ['ok' => true, 'text' => trim($text), 'truncated' => ($j['stop_reason'] ?? '') === 'max_tokens']);
+    }
+    json_out(405, ['ok' => false, 'code' => 'invalid_request', 'error' => 'Not allowed.']);
 }
 
 $error = '';
