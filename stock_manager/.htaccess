@@ -1,3 +1,6 @@
+# Always open the password-protected page
+DirectoryIndex index.php
+
 # Keep the private password file and the page templates off the web.
 <FilesMatch "^\.(auth|data)\.json$">
   <IfModule mod_authz_core.c>

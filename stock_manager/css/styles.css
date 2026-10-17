@@ -279,3 +279,9 @@ img{max-width:100%}
 }
 
 .modal .field input{min-height:44px}
+
+/* text table entry */
+.t-dept{font-weight:600}
+.t-meta{font-size:13px;color:var(--muted);margin-top:-4px;min-height:1.2em}
+.t-meta b{color:var(--ink);font-family:var(--f-mono);font-weight:600}
+.t-meta .warn{color:var(--warn)}

@@ -14,9 +14,9 @@ let items = new Map();
 let deptDocs = new Map();
 let logs = [];
 let loaded = false;
-const ui = { tab: "stock", rmode: "photo", smode: "text", repDept: "", photos: [] };
+const ui = { tab: "stock", rmode: "photo", smode: "text", repDept: "", rdept: "", sdept: "", photos: [] };
 try { const s = JSON.parse(localStorage.getItem("bs-ui") || "{}"); Object.assign(ui, s, { photos: [] }); } catch (e) {}
-const saveUi = () => { try { localStorage.setItem("bs-ui", JSON.stringify({ tab: ui.tab, rmode: ui.rmode, smode: ui.smode, repDept: ui.repDept })); } catch (e) {} };
+const saveUi = () => { try { localStorage.setItem("bs-ui", JSON.stringify({ tab: ui.tab, rmode: ui.rmode, smode: ui.smode, repDept: ui.repDept, rdept: ui.rdept, sdept: ui.sdept })); } catch (e) {} };
 
 /* ---------- helpers ---------- */
 function toast(msg) {
@@ -57,7 +57,25 @@ function wireDeptSelect(sel, onChange) {
     onChange && onChange();
   });
 }
+function tableDeptOptions(mode, v) {
+  let o = `<option value="">${mode === "receive" ? "Mixed — department written on each line" : "Any department"}</option>`, found = false;
+  for (const d of depts()) { const sel = !!v && norm(d) === norm(v); if (sel) found = true; o += `<option value="${esc(d)}"${sel ? " selected" : ""}>${esc(d)}</option>`; }
+  if (v && !found) o += `<option value="${esc(v)}" selected>${esc(v)}</option>`;
+  if (canWrite && mode === "receive") o += '<option value="__new">+ New department…</option>';
+  return o;
+}
+function refreshTableDepts() {
+  for (const mode of ["receive", "shelf"]) {
+    const sel = $(mode === "receive" ? "#r-tdept" : "#s-tdept"); if (!sel) continue;
+    const key = mode === "receive" ? "rdept" : "sdept";
+    let v = sel.value && sel.value !== "__new" ? sel.value : ui[key];
+    if (mode === "shelf" && v && !depts().some(d => norm(d) === norm(v))) v = "";
+    sel.innerHTML = tableDeptOptions(mode, v); sel.dataset.prev = sel.value;
+    updateTableHelp(mode);
+  }
+}
 function refreshDeptSelects() {
+  refreshTableDepts();
   $$("select.f-dept, select.rv-dept, select#ed-dept").forEach(sel => { const v = sel.value === "__new" ? "" : sel.value; sel.innerHTML = deptOptions(v); sel.dataset.prev = sel.value; });
 }
 async function ensureDept(name) {
@@ -475,6 +493,125 @@ for (const mode of ["receive", "shelf"]) {
   });
 }
 
+/* ---------- text table reader ---------- */
+const NUM_RE = /^\d{1,3}(?:,\d{3})*(?:\.\d+)?$|^\d+(?:\.\d+)?$/;
+const toQty = c => { const t = String(c || "").trim().replace(/\s*(?:pcs?|units?|ea|each|cs|cases?|ct)\.?$/i, ""); return NUM_RE.test(t) ? Math.round(parseFloat(t.replace(/,/g, ""))) : null; };
+function splitCells(line) {
+  let cells = null;
+  if (line.includes("\t")) cells = line.split("\t");
+  else if (line.includes("|")) cells = line.split("|");
+  else if (/\S\s{2,}\S/.test(line)) cells = line.trim().split(/\s{2,}/);
+  else if ((line.match(/,/g) || []).length >= 1 && /,\s*\d[\d,.]*\s*$/.test(line)) cells = line.split(/\s*,\s*/);
+  if (!cells) return null;
+  cells = cells.map(c => c.trim().replace(/^"(.*)"$/, "$1"));
+  while (cells.length && cells[0] === "") cells.shift();
+  while (cells.length && cells[cells.length - 1] === "") cells.pop();
+  return cells.length >= 2 ? cells : null;
+}
+// Reads pasted spreadsheet rows, "name | qty" tables, CSV, or plain "name 12" lines.
+function parseTable(text) {
+  const lines = text.split(/\r?\n/).map(l => l.replace(/^\s*[-*•]\s+/, "")).filter(l => l.trim() && !/^[\s|:+=_-]+$/.test(l));
+  const split = lines.map(splitCells);
+  let nameCol = -1, qtyCol = -1, deptCol = -1, start = 0;
+  // header row?
+  const h = split[0];
+  if (h && !h.some(c => toQty(c) !== null) && h.some(c => /item|name|product|desc|qty|quantity|count|units|amount|dept|category/i.test(c))) {
+    h.forEach((c, i) => {
+      if (nameCol < 0 && /item|name|product|desc/i.test(c)) nameCol = i;
+      else if (deptCol < 0 && /dept|department|category|section/i.test(c)) deptCol = i;
+    });
+    // quantity column: units/qty beat cases
+    for (const re of [/qty|quantity|units?\b|pcs|pieces|each/i, /count|amount|received|pulled|on ?hand|total/i, /cases?|cs\b/i]) {
+      const i = h.findIndex((c, k) => k !== nameCol && k !== deptCol && re.test(c));
+      if (i >= 0) { qtyCol = i; break; }
+    }
+    start = 1;
+  }
+  const body = split.slice(start).filter(Boolean);
+  const width = body.reduce((a, r) => Math.max(a, r.length), 0);
+  if (width >= 2) {
+    if (qtyCol < 0) { // the column that is a number on most rows, rightmost wins ties
+      let best = -1, bestN = 0;
+      for (let i = 0; i < width; i++) { const n = body.filter(r => toQty(r[i]) !== null).length; if (n >= bestN && n > 0) { best = i; bestN = n; } }
+      qtyCol = best;
+    }
+    if (nameCol < 0) { // the longest mostly-text column
+      let best = -1, bestL = -1;
+      for (let i = 0; i < width; i++) {
+        if (i === qtyCol || i === deptCol) continue;
+        const vals = body.map(r => r[i] || "").filter(v => v && toQty(v) === null);
+        const avg = vals.reduce((a, v) => a + v.length, 0) / Math.max(1, body.length);
+        if (avg > bestL) { best = i; bestL = avg; }
+      }
+      nameCol = best;
+    }
+    if (deptCol < 0) { // a column whose values are mostly known departments
+      const known = new Set(depts().map(norm));
+      for (let i = 0; i < width; i++) {
+        if (i === qtyCol || i === nameCol) continue;
+        const vals = body.map(r => r[i]).filter(Boolean);
+        if (vals.length && vals.filter(v => known.has(norm(v))).length >= vals.length / 2) { deptCol = i; break; }
+      }
+    }
+  }
+  const out = [];
+  lines.slice(start).forEach((line, k) => {
+    const cells = split[start + k];
+    let row;
+    if (cells && nameCol >= 0) {
+      const q = qtyCol >= 0 ? toQty(cells[qtyCol]) : null;
+      row = { name: (cells[nameCol] || "").trim(), dept: deptCol >= 0 ? (cells[deptCol] || "").trim() : "", qty: q === null ? 0 : q };
+    } else {
+      row = localParse(line)[0];
+    }
+    if (!row || !row.name || /^(sub)?total\b|^grand total\b/i.test(row.name)) return;
+    out.push(row);
+  });
+  return out;
+}
+function looksLikeTable(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return false;
+  const tabular = lines.filter(l => splitCells(l)).length;
+  const endsNum = lines.filter(l => /\d\s*(?:pcs?|units?|ea|each|cs|ct)?\.?\s*$/i.test(l)).length;
+  return tabular >= lines.length * 0.6 || endsNum >= lines.length * 0.8;
+}
+// Put every row under the chosen department, and match names to existing items.
+function applyTableDept(mode, rows, dept) {
+  return rows.map(r => {
+    const d = dept || r.dept;
+    const it = findItem(r.name, d, mode === "receive" && !!dept);
+    if (it) return { ...r, name: it.name, dept: it.dept };
+    return { ...r, dept: d };
+  });
+}
+function updateTableHelp(mode) {
+  const sel = $(mode === "receive" ? "#r-tdept" : "#s-tdept"), ta = $(mode === "receive" ? "#r-text" : "#s-text");
+  const label = $(mode === "receive" ? "#r-tlabel" : "#s-tlabel"), meta = $(mode === "receive" ? "#r-tmeta" : "#s-tmeta");
+  if (!sel || !ta) return;
+  const d = sel.value && sel.value !== "__new" ? sel.value : "";
+  if (mode === "receive") {
+    label.textContent = d ? `2 · Paste or type the ${d} delivery — item and quantity` : "2 · Paste or type your stock table — item, department, quantity";
+    ta.placeholder = d ? "Item\tQty\nWhole Milk 1 gal\t24\nGreek Yogurt 32oz\t12\nLarge Eggs 18ct\t30\n\nPaste straight from Excel or Google Sheets, or type one item per line." :
+      "Item\tDepartment\tQty\nWhole Milk 1 gal\tDairy\t24\nBananas\tProduce\t40\n\nOr pick a department above and list just item and quantity.";
+  } else {
+    label.textContent = d ? `2 · Paste or type what you're moving from ${d} — item and quantity` : "2 · Paste or type what you're moving to the shelf — item and quantity";
+    ta.placeholder = "Item\tQty\nWhole Milk 1 gal\t6\nBananas\t10\n\nPaste straight from Excel or Google Sheets, or type one item per line.";
+  }
+  const text = ta.value.trim();
+  if (!text) { meta.textContent = ""; return; }
+  const rows = parseTable(text);
+  const units = rows.reduce((a, r) => a + (r.qty || 0), 0), noQty = rows.filter(r => !r.qty).length;
+  meta.innerHTML = `<b>${rows.length}</b> item${rows.length === 1 ? "" : "s"} · <b>${fmtN(units)}</b> units${d ? ` · ${esc(d)}` : ""}${noQty ? ` · <span class="warn">${noQty} without a quantity</span>` : ""}`;
+}
+for (const mode of ["receive", "shelf"]) {
+  const p = mode === "receive" ? "r" : "s";
+  const sel = $(`#${p}-tdept`), ta = $(`#${p}-text`);
+  wireDeptSelect(sel, () => { ui[mode === "receive" ? "rdept" : "sdept"] = sel.value === "__new" ? "" : sel.value; saveUi(); updateTableHelp(mode); ta.focus(); });
+  ta.addEventListener("input", () => { clearTimeout(ta._t); ta._t = setTimeout(() => updateTableHelp(mode), 150); });
+  $(`#btn-${p}clear`).addEventListener("click", () => { ta.value = ""; updateTableHelp(mode); $(`#${p === "r" ? "rtext" : "stext"}-status`).textContent = ""; ta.focus(); });
+}
+
 /* ---------- parsing (Claude + local fallback) ---------- */
 function localParse(text) {
   const out = [];
@@ -493,7 +630,7 @@ function localParse(text) {
   }
   return out;
 }
-async function aiParse(mode, { text, images, signal }) {
+async function aiParse(mode, { text, images, signal, dept }) {
   const catalog = allItems().slice(0, 600).map(i => `${i.name} | ${i.dept}`).join("\n");
   const source = images ? "photo(s) of a delivery: a packing slip, invoice, or the products themselves" : "a stock list typed quickly by a store worker";
   const prompt = `You are reading ${source} for a store's backstock (stockroom) inventory.
@@ -504,7 +641,7 @@ ${catalog || "(none yet)"}
 
 Known departments: ${depts().join(", ") || "(none yet; choose short, sensible ones such as Dairy or Produce)"}
 
-Rules:
+${dept ? `Every product in this list belongs to the ${dept} department. Use "${dept}" as dept for all of them.\n\n` : ""}Rules:
 - When a line or product refers to an existing item, use that item's exact name and department.
 - Otherwise write a clear, short product name and choose the best department from the known list, or a sensible new one.
 - qty is a whole number of units. If both a case count and a pack size are given (for example "2 cs x 12"), multiply them.
@@ -600,17 +737,21 @@ async function readTextList(mode) {
   const ta = $(mode === "receive" ? "#r-text" : "#s-text"), st = $(mode === "receive" ? "#rtext-status" : "#stext-status");
   const btn = $(mode === "receive" ? "#btn-rtext" : "#btn-stext");
   const text = ta.value.trim();
-  if (!text) { st.className = "status err"; st.textContent = "Type at least one item."; ta.focus(); return; }
+  const sel = $(mode === "receive" ? "#r-tdept" : "#s-tdept");
+  const dept = sel && sel.value !== "__new" ? sel.value : "";
+  const src = dept ? `your ${dept} table` : "your table";
+  if (!text) { st.className = "status err"; st.textContent = "Paste or type at least one item."; ta.focus(); return; }
   st.className = "status";
-  if (!sample) { showReview(mode, localParse(text), "your list"); st.textContent = ""; return; }
+  // A clean table (columns, or one "name qty" per line) is read right here: instant and free.
+  if (!sample || looksLikeTable(text)) { showReview(mode, applyTableDept(mode, parseTable(text), dept), src); st.textContent = ""; return; }
   btn.disabled = true; st.textContent = "Claude is reading your list…";
   try {
-    const rows = await aiParse(mode, { text });
+    const rows = await aiParse(mode, { text, dept });
     st.textContent = "";
-    showReview(mode, rows, "your list");
+    showReview(mode, applyTableDept(mode, rows, dept), src);
   } catch (e) {
     // fall back to the simple line reader so the user is never stuck
-    showReview(mode, localParse(text), "your list");
+    showReview(mode, applyTableDept(mode, parseTable(text), dept), src);
     st.className = "status err";
     st.textContent = (e?.code === "not_granted" || e?.code === "sampling_disabled") ? "Read line by line without Claude. Check the rows below." : errCopy(e?.code) + " Read line by line instead.";
   }

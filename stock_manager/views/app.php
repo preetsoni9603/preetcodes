@@ -1,3 +1,4 @@
+<?php if (!defined('BACKSTOCK')) { http_response_code(404); exit; } ?>
 <!doctype html>
 <html lang="en">
 <head>
@@ -34,7 +35,7 @@
 
 <main class="wrap">
   <div class="banner" id="ro-banner" hidden>You can view this inventory but not change it. Ask the owner for edit access.</div>
-  <div class="banner" id="offline-banner" hidden>Inventory storage isn't available in this view. Open the page in Claude while signed in to load and save stock.</div>
+  <div class="banner" id="offline-banner" hidden>Couldn't load your inventory from the website. Check your internet connection and reload the page.</div>
 
   <!-- STOCK -->
   <section class="panel" id="p-stock" data-panel="stock">
@@ -62,7 +63,7 @@
       <div><h2>Receive a delivery</h2><p>Counts you enter here are added to backstock.</p></div>
       <div class="seg" role="group" aria-label="Entry method">
         <button data-rmode="photo" aria-pressed="true">Photo</button>
-        <button data-rmode="text" aria-pressed="false">Type a list</button>
+        <button data-rmode="text" aria-pressed="false">Text table</button>
         <button data-rmode="form" aria-pressed="false">Form</button>
       </div>
     </div>
@@ -86,11 +87,15 @@
 
     <div class="card pad" data-rpane="text" hidden>
       <div style="display:flex;flex-direction:column;gap:12px">
-        <label class="field" for="r-text"><span class="label">One item per line — name, department, quantity</span>
-          <textarea id="r-text" placeholder="Whole milk 1 gal, Dairy, 24&#10;Bananas, Produce, 40&#10;Paper towels 6pk - 12&#10;3 cases x 12 Sparkling water"></textarea></label>
+        <label class="field" for="r-tdept"><span class="label">1 · Department</span>
+          <select id="r-tdept" class="t-dept"></select></label>
+        <label class="field" for="r-text"><span class="label" id="r-tlabel">2 · Paste or type your stock table</span>
+          <textarea id="r-text" spellcheck="false"></textarea></label>
+        <div class="t-meta" id="r-tmeta"></div>
         <div class="actions">
-          <button class="btn primary" id="btn-rtext">Read list</button>
-          <span class="status" id="rtext-status">Department is optional for items you already stock.</span>
+          <button class="btn primary" id="btn-rtext">Read table</button>
+          <button class="btn" id="btn-rclear" type="button">Clear</button>
+          <span class="status" id="rtext-status"></span>
         </div>
       </div>
     </div>
@@ -115,17 +120,21 @@
     <div class="panel-head">
       <div><h2>Move stock to the shelf</h2><p>Counts you enter here are taken out of backstock.</p></div>
       <div class="seg" role="group" aria-label="Entry method">
-        <button data-smode="text" aria-pressed="true">Type a list</button>
+        <button data-smode="text" aria-pressed="true">Text table</button>
         <button data-smode="form" aria-pressed="false">Form</button>
       </div>
     </div>
 
     <div class="card pad" data-spane="text">
       <div style="display:flex;flex-direction:column;gap:12px">
-        <label class="field" for="s-text"><span class="label">One item per line — name and quantity pulled</span>
-          <textarea id="s-text" placeholder="Whole milk 1 gal - 6&#10;Bananas 10&#10;Paper towels, 4"></textarea></label>
+        <label class="field" for="s-tdept"><span class="label">1 · Department</span>
+          <select id="s-tdept" class="t-dept"></select></label>
+        <label class="field" for="s-text"><span class="label" id="s-tlabel">2 · Paste or type what you're moving to the shelf</span>
+          <textarea id="s-text" spellcheck="false"></textarea></label>
+        <div class="t-meta" id="s-tmeta"></div>
         <div class="actions">
-          <button class="btn primary" id="btn-stext">Read list</button>
+          <button class="btn primary" id="btn-stext">Read table</button>
+          <button class="btn" id="btn-sclear" type="button">Clear</button>
           <span class="status" id="stext-status"></span>
         </div>
       </div>
@@ -169,12 +178,20 @@
 
 <datalist id="dl-names"></datalist>
 <datalist id="dl-depts"></datalist>
+<nav class="bnav" aria-label="Sections">
+  <button class="tab btab" role="tab" data-tab="stock" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg><span>Stock</span></button>
+  <button class="tab btab" role="tab" data-tab="receive" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h12v10H2z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg><span>Receive</span></button>
+  <button class="tab btab" role="tab" data-tab="shelf" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M3 13h18"/><path d="M5 13V9h5v4M13 13V6h6v7M6 21v-4h4v4M14 21v-5h4v5"/></svg><span>To shelf</span></button>
+  <button class="tab btab" role="tab" data-tab="reports" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h8M9 17h6"/></svg><span>Reports</span></button>
+  <button class="tab btab" role="tab" data-tab="activity" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Activity</span></button>
+</nav>
 <div id="modal-root"></div>
 <div id="modal2"></div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>window.BACKSTOCK_LOCK = true;</script>
 <script src="js/standalone.js"></script>
 <script src="js/app.js"></script>
 </body>
