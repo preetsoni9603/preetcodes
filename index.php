@@ -134,8 +134,34 @@
 
       <div class="project-card" style="--card-glow: var(--indigo);">
         <div class="project-top">
-          <h3 class="project-title">Trend-Fx — Financial Data Dashboard</h3>
+          <h3 class="project-title">Backstock Manager — Inventory Tracking App</h3>
           <span class="project-num">02</span>
+        </div>
+        <p class="project-desc">A password-protected stockroom inventory app. Receive deliveries by photo, pasted spreadsheet table or form, move stock to the shelf, search counts instantly, and export department PDF reports. Data is stored server-side and syncs across devices, with Claude AI reading packing slips into stock lists.</p>
+        <div class="project-bottom">
+          <div class="project-stack"><span class="tag">PHP</span><span class="tag">JavaScript</span><span class="tag">Claude API</span></div>
+          <div class="project-links">
+            <a href="/stock_manager/" target="_blank" rel="noopener">Live ↗</a>
+            <a href="https://github.com/preetsoni9603/preetcodes/tree/main/stock_manager" target="_blank" rel="noopener">Code ↗</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="project-card" style="--card-glow: var(--coral);">
+        <div class="project-top">
+          <h3 class="project-title">Marketplace with Search and Recommendations</h3>
+          <span class="project-num">03</span>
+        </div>
+        <p class="project-desc">An online marketplace where users list and browse items, with keyword search and filters to find listings fast and a recommendation feature that suggests related items. Built for the CSCI 5360 Web Technologies course at Saint Louis University.</p>
+        <div class="project-bottom">
+          <span class="ongoing-badge"><i class="status-dot"></i>Ongoing</span>
+        </div>
+      </div>
+
+      <div class="project-card" style="--card-glow: var(--indigo);">
+        <div class="project-top">
+          <h3 class="project-title">Trend-Fx — Financial Data Dashboard</h3>
+          <span class="project-num">04</span>
         </div>
         <p class="project-desc">A financial data visualization tool with React.js frontend features and UI enhancements. Integrated REST APIs with Recharts to render live, interactive data visualizations, and managed sprint planning and task tracking in Trello.</p>
         <div class="project-bottom">
@@ -149,7 +175,7 @@
       <div class="project-card" style="--card-glow: var(--coral);">
         <div class="project-top">
           <h3 class="project-title">E-Learning Website</h3>
-          <span class="project-num">03</span>
+          <span class="project-num">05</span>
         </div>
         <p class="project-desc">Backend integration and content management features for a functioning e-learning platform, with page layouts designed alongside a developer team to improve site functionality and usability.</p>
         <div class="project-bottom">
@@ -163,7 +189,7 @@
       <div class="project-card" style="--card-glow: var(--indigo-soft);">
         <div class="project-top">
           <h3 class="project-title">Java Quiz Application</h3>
-          <span class="project-num">04</span>
+          <span class="project-num">06</span>
         </div>
         <p class="project-desc">A desktop quiz application with login/registration, score tracking, and results display, built with an interactive Swing-based GUI to streamline the user experience.</p>
         <div class="project-bottom">
@@ -177,7 +203,7 @@
       <div class="project-card" style="--card-glow: var(--coral);">
         <div class="project-top">
           <h3 class="project-title">2D Java Game</h3>
-          <span class="project-num">05</span>
+          <span class="project-num">07</span>
         </div>
         <p class="project-desc">A 2D game with player movement, creature AI, and map interaction using object-oriented design, with collision handling and reusable component architecture for improved gameplay mechanics.</p>
         <div class="project-bottom">
@@ -213,8 +239,14 @@
     </div>
 
     <ul class="cert-list">
-      <li><b>Java Training</b> — Spoken Tutorial, IIT Bombay (Jun 2023)</li>
+      <li><b>Agents and Workflows</b> — OpenAI Academy (Oct 2026)</li>
+      <li><b>Introduction to Claude Cowork</b> — Anthropic Academy (Oct 2026)</li>
+      <li><b>Claude Code 101</b> — Anthropic Academy (Sep 2026)</li>
+      <li><b>Claude 101</b> — Anthropic Academy (Sep 2026)</li>
+      <li><b>Applied AI Foundations</b> — OpenAI Academy (Sep 2026)</li>
+      <li><b>AI Foundations</b> — OpenAI Academy (Aug 2026)</li>
       <li><b>Career Essentials: Getting Started with Your Professional Journey</b> (Nov 2024)</li>
+      <li><b>Java Training</b> — Spoken Tutorial, IIT Bombay (Jun 2023)</li>
     </ul>
   </div>
 </section>
@@ -226,7 +258,7 @@
         <h3>Want the full picture?</h3>
         <p>Full experience, education, and skills in one page</p>
       </div>
-      <a class="btn btn-primary" href="/Preet%20Resume.pdf" download>Download Resume</a>
+      <a class="btn btn-primary" href="/Preet%20Resume.pdf?v=2026-10" download="Preet_Soni_Resume.pdf">Download Resume</a>
     </div>
   </div>
 </section>

@@ -30,7 +30,7 @@
       <h1 class="name">Preet Soni</h1>
       <p class="role">I'm a full-stack developer who builds both web applications and Windows desktop applications, with a solid foundation across React.js, Java, PHP/MySQL, and WordPress. What sets my work apart is hands-on experience at the intersection of software development and AI — I've worked directly on training AI agents as part of the development process, giving me practical, real-world insight into how AI can be woven into modern engineering workflows. From writing clean, maintainable code to leveraging AI for faster debugging, smarter testing, and more efficient problem-solving, I bring an AI-augmented approach to every project I build. I'm driven by a passion for creating reliable, well-crafted software — and by staying ahead of the curve as AI reshapes how developers work.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="/Preet%20Resume.pdf" download> Download Resume</a>
+        <a class="btn btn-primary" href="/Preet%20Resume.pdf?v=2026-10" download="Preet_Soni_Resume.pdf"> Download Resume</a>
         <a class="btn btn-ghost" href="#projects">View projects</a>
       </div>
     </div>
