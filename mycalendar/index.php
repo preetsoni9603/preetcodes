@@ -7,6 +7,8 @@
  * - Tasks are saved on the server in /home/<you>/.mycalendar-data.json
  *   (fallback: .data.json in this folder, blocked by .htaccess), so every
  *   device you sign in on sees the same tasks.
+ * - Multi-day tasks: a task can have a start date and an end (due) date; it
+ *   shows on every day in between, here and in Google Calendar.
  * - Google Calendar: after you connect it in Settings, every task you add,
  *   change, finish or delete is mirrored to your primary Google Calendar with
  *   a reminder, and your Google events show up in the planner. Google then
@@ -231,13 +233,34 @@ function g_access(array &$a): string {
     persist($a);
     return (string)$j['access_token'];
 }
+function g_multi(array $t): string {
+    $st = (string)($t['start'] ?? ''); $due = (string)($t['due'] ?? '');
+    return (preg_match('/^\d{4}-\d{2}-\d{2}$/', $st) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $due) && $st < $due) ? $st : '';
+}
+/** Multi-day task: one all-day event covering every day from start to end, reminding the evening before it starts. */
+function g_span_body(string $id, array $t, string $start): array {
+    $dept = trim((string)($t['department'] ?? '')) ?: 'Personal';
+    $done = !empty($t['done']);
+    $pri  = (string)($t['priority'] ?? 'normal');
+    $end  = (new DateTime((string)$t['due']))->modify('+1 day')->format('Y-m-d');
+    $time = preg_match('/^\d{2}:\d{2}$/', (string)($t['time'] ?? '')) ? (new DateTime('2000-01-01 ' . $t['time']))->format('g:i A') : 'end of day';
+    return [
+        'summary' => ($done ? '✓ ' : '') . '[' . $dept . '] ' . (string)($t['name'] ?? 'Task'),
+        'description' => trim((string)($t['note'] ?? '') . "\n\nRuns " . $start . ' to ' . $t['due'] . ', due ' . $time . " on the last day.\nDepartment: " . $dept . "\nAdded from My Calendar"),
+        'status' => 'confirmed', 'transparency' => 'transparent',
+        'start' => ['date' => $start], 'end' => ['date' => $end],
+        'extendedProperties' => ['private' => ['mycal' => '1', 'taskId' => $id, 'part' => 'span']],
+        'reminders' => $done ? ['useDefault' => false, 'overrides' => []] : ['useDefault' => false, 'overrides' => [['method' => 'popup', 'minutes' => 420]]],
+        'colorId' => $pri === 'urgent' ? '11' : ($pri === 'high' ? '6' : '7'),
+    ];
+}
 function g_event_body(string $id, array $t, string $tz): array {
     $dept = trim((string)($t['department'] ?? '')) ?: 'Personal';
     $done = !empty($t['done']);
     $pri  = (string)($t['priority'] ?? 'normal');
     $note = trim((string)($t['note'] ?? ''));
     $ev = [
-        'summary' => ($done ? '✓ ' : '') . '[' . $dept . '] ' . (string)($t['name'] ?? 'Task'),
+        'summary' => ($done ? '✓ ' : '') . (g_multi($t) !== '' ? 'Due: ' : '') . '[' . $dept . '] ' . (string)($t['name'] ?? 'Task'),
         'description' => ($note !== '' ? $note . "\n\n" : '') . 'Department: ' . $dept . "\nPriority: " . ucfirst($pri) . "\nAdded from My Calendar",
         'status' => 'confirmed',
         'transparency' => 'transparent',
@@ -262,32 +285,41 @@ function g_event_body(string $id, array $t, string $tz): array {
     if ($pri === 'urgent') $ev['colorId'] = '11'; elseif ($pri === 'high') $ev['colorId'] = '6'; else $ev['colorId'] = '7';
     return $ev;
 }
-/** Mirror one task to Google. $t null = delete. Returns ['eventId'=>…] or ['err'=>…] or ['skip'=>true]. */
-function g_push(array &$a, string $id, ?array $t, string $evId): array {
+/** Create or update one event. Returns [eventId, error]. */
+function g_upsert(array $h, string $evId, array $body): array {
+    if ($evId !== '') {
+        [$st, $j] = http_req('PATCH', GCAL_EVENTS . '/' . rawurlencode($evId), $body, $h);
+        if ($st === 200 && !empty($j['id'])) return [(string)$j['id'], ''];
+        if ($st !== 404 && $st !== 410) return ['', 'Google Calendar did not accept the change.'];
+    }
+    [$st, $j] = http_req('POST', GCAL_EVENTS, $body, $h);
+    if ($st === 200 && !empty($j['id'])) return [(string)$j['id'], ''];
+    return ['', $st === 0 ? 'Could not reach Google Calendar.' : 'Google Calendar did not accept the event.'];
+}
+/** Mirror one task to Google: a due-date event with the task's reminder, plus, for a multi-day task,
+    an all-day event across every day of it. $t null = delete both. */
+function g_push(array &$a, string $id, ?array $t, string $evId, string $spanId): array {
     $tok = g_access($a);
     if ($tok === '') return ['skip' => true];
     $h = ['Authorization: Bearer ' . $tok];
-    if ($t === null) {
-        if ($evId !== '') http_req('DELETE', GCAL_EVENTS . '/' . rawurlencode($evId), null, $h);
-        return ['eventId' => ''];
-    }
-    $body = g_event_body($id, $t, g_tz($a));
-    if ($evId !== '') {
-        [$st, $j] = http_req('PATCH', GCAL_EVENTS . '/' . rawurlencode($evId), $body, $h);
-        if ($st === 200 && !empty($j['id'])) return ['eventId' => (string)$j['id']];
-        if ($st !== 404 && $st !== 410) return ['err' => 'Google Calendar did not accept the change.'];
-    }
-    [$st, $j] = http_req('POST', GCAL_EVENTS, $body, $h);
-    if ($st === 200 && !empty($j['id'])) return ['eventId' => (string)$j['id']];
-    return ['err' => $st === 0 ? 'Could not reach Google Calendar.' : 'Google Calendar did not accept the event.'];
+    $del = function (string $e) use ($h) { if ($e !== '') http_req('DELETE', GCAL_EVENTS . '/' . rawurlencode($e), null, $h); };
+    if ($t === null) { $del($evId); $del($spanId); return ['eventId' => '', 'spanId' => '']; }
+    [$newEv, $err] = g_upsert($h, $evId, g_event_body($id, $t, g_tz($a)));
+    if ($err !== '') return ['err' => $err];
+    $start = g_multi($t); $newSpan = '';
+    if ($start !== '') {
+        [$newSpan, $err] = g_upsert($h, $spanId, g_span_body($id, $t, $start));
+        if ($err !== '') return ['err' => $err, 'eventId' => $newEv];
+    } else $del($spanId);
+    return ['eventId' => $newEv, 'spanId' => $newSpan];
 }
-/** Push a list of [id => previous eventId] and save the new event ids onto the tasks. Returns error count. */
+/** Push [id => ['ev'=>…, 'span'=>…]] (previous event ids) and save the new ids onto the tasks. Returns error count. */
 function g_sync(array &$a, array $changed): int {
     if (!$changed || !g_connected($a)) return 0;
     $d = read_data(); $results = []; $errors = 0;
-    foreach ($changed as $id => $oldEv) {
+    foreach ($changed as $id => $old) {
         $t = $d['tasks'][$id] ?? null;
-        $r = g_push($a, (string)$id, $t, (string)($t['gcalId'] ?? $oldEv));
+        $r = g_push($a, (string)$id, $t, (string)($t['gcalId'] ?? $old['ev']), (string)($t['gcalSpanId'] ?? $old['span']));
         if (!empty($r['skip'])) return 0;
         if (isset($r['err'])) $errors++;
         if ($t !== null) $results[$id] = $r;
@@ -295,8 +327,9 @@ function g_sync(array &$a, array $changed): int {
     if ($results) change_data(function (array &$d) use ($results) {
         foreach ($results as $id => $r) {
             if (!isset($d['tasks'][$id])) continue;
-            if (isset($r['eventId'])) { $d['tasks'][$id]['gcalId'] = $r['eventId']; unset($d['tasks'][$id]['gcalErr']); }
-            else $d['tasks'][$id]['gcalErr'] = $r['err'];
+            if (isset($r['eventId'])) $d['tasks'][$id]['gcalId'] = $r['eventId'];
+            if (array_key_exists('spanId', $r)) { if ($r['spanId'] !== '') $d['tasks'][$id]['gcalSpanId'] = $r['spanId']; else unset($d['tasks'][$id]['gcalSpanId']); }
+            if (isset($r['err'])) $d['tasks'][$id]['gcalErr'] = $r['err']; else unset($d['tasks'][$id]['gcalErr']);
         }
         return null;
     });
@@ -383,13 +416,13 @@ if (in_array($action, $api, true)) {
                 $op = $o['op'] ?? ''; $c = $o['coll'] ?? ''; $id = (string)($o['id'] ?? '');
                 if (!in_array($c, DATA_COLLS, true) || !valid_id($id)) return 'Bad item reference.';
                 $prev = $d[$c][$id] ?? null;
-                if ($c === 'tasks') $changed[$id] = (string)($prev['gcalId'] ?? '');
+                if ($c === 'tasks') $changed[$id] = ['ev' => (string)($prev['gcalId'] ?? ''), 'span' => (string)($prev['gcalSpanId'] ?? '')];
                 if ($op === 'delete') { unset($d[$c][$id]); continue; }
                 $doc = $o['data'] ?? null;
                 if (!is_array($doc) || strlen(json_encode($doc)) > 32768) return 'Bad item data.';
-                unset($doc['gcalId'], $doc['gcalErr']); // owned by the server
+                unset($doc['gcalId'], $doc['gcalSpanId'], $doc['gcalErr']); // owned by the server
                 if ($op === 'set') {
-                    if ($c === 'tasks' && $prev && !empty($prev['gcalId'])) $doc['gcalId'] = $prev['gcalId'];
+                    if ($c === 'tasks' && $prev) foreach (['gcalId', 'gcalSpanId'] as $k) if (!empty($prev[$k])) $doc[$k] = $prev[$k];
                     $d[$c][$id] = $doc;
                 } elseif ($op === 'update') {
                     if (!$prev) return 'That task no longer exists. Reload and try again.';
@@ -406,7 +439,7 @@ if (in_array($action, $api, true)) {
         if (!g_connected($auth)) json_out(400, ['ok' => false, 'code' => 'not_connected', 'error' => 'Connect Google Calendar first.']);
         @set_time_limit(120);
         $d = read_data(); $changed = [];
-        foreach ($d['tasks'] as $id => $t) $changed[$id] = (string)($t['gcalId'] ?? '');
+        foreach ($d['tasks'] as $id => $t) $changed[$id] = ['ev' => (string)($t['gcalId'] ?? ''), 'span' => (string)($t['gcalSpanId'] ?? '')];
         $errs = g_sync($auth, array_slice($changed, 0, 300, true));
         json_out(200, ['ok' => true, 'count' => min(count($changed), 300), 'gcalErrors' => $errs]);
     }

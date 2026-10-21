@@ -65,6 +65,15 @@ function untilText(ms){
   return ms>=0?'in '+s:s+' ago';
 }
 const sortByDue=(a,b)=>dueAt(a)-dueAt(b);
+/* multi-day tasks: `start` (YYYY-MM-DD) is optional; `due` is the end date */
+const startOf=t=>t.start&&t.start<t.due?t.start:t.due;
+const isMulti=t=>startOf(t)!==t.due;
+const spansDay=(t,key)=>startOf(t)<=key&&key<=t.due;
+const dayDiff=(a,b)=>Math.round((parseDay(b)-parseDay(a))/864e5);
+const dayCount=t=>dayDiff(startOf(t),t.due)+1;
+const shortDate=k=>parseDay(k).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+function spanText(t){return shortDate(startOf(t))+' – '+shortDate(t.due)+' · '+dayCount(t)+' days'}
+function dayOfText(t,key){return 'Day '+(dayDiff(startOf(t),key)+1)+' of '+dayCount(t)}
 const isOver=t=>!t.done&&dueAt(t)<new Date();
 function allDepts(){const s=new Set(deptList);tasks.forEach(t=>s.add(deptOf(t)));return [...s]}
 function deptCount(d){return tasks.filter(t=>deptOf(t)===d).length}
@@ -108,7 +117,7 @@ async function write(ops){
   await pull(true);
   return j;
 }
-function bodyOf(t){const b={};['name','time','due','priority','remind','note','department','done','doneAt','createdAt','snoozeUntil'].forEach(k=>{if(t[k]!==undefined&&t[k]!==null)b[k]=t[k]});return b}
+function bodyOf(t){const b={};['name','time','start','due','priority','remind','note','department','done','doneAt','createdAt','snoozeUntil'].forEach(k=>{if(t[k]!==undefined&&t[k]!==null)b[k]=t[k]});return b}
 async function saveTask(t){
   if(!t.id)t.id='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const i=tasks.findIndex(x=>x.id===t.id); if(i>=0)tasks[i]=t; else tasks.push(t);
@@ -169,6 +178,7 @@ function computeNotifs(){
     let kind=null;
     if(now>at)kind='overdue'; else if(now>=remindAt)kind='soon';
     else if(startOfDay(at).getTime()===startOfDay(now).getTime())kind='today';
+    else if(isMulti(t)&&startOf(t)===ymd(now))kind='starts';
     else if(at-now<36*36e5)kind='upcoming';
     if(!kind)return;
     const key=notifKey(kind,t);
@@ -216,9 +226,11 @@ function openForm(t,preset){
       <div class="deptsel"><span class="ddot" id="fDeptDot" style="background:${deptColor(dept)}"></span><select id="fDept">${allDepts().map(d=>`<option value="${esc(d)}"${d===dept?' selected':''}>${esc(d)}</option>`).join('')}<option value="__new">+ New department…</option></select></div>
       <input id="fDeptNew" maxlength="30" placeholder="Name the new department, e.g. Office Ease" hidden></div>
     <div class="row2">
-      <div class="field"><label for="fDue">Due</label><input id="fDue" type="date" value="${esc(t.due)}"></div>
-      <div class="field"><label for="fTime">Time</label><input id="fTime" type="time" value="${esc(t.time)}"></div>
+      <div class="field"><label for="fStart">Start date</label><input id="fStart" type="date" value="${esc(t.start||t.due)}"></div>
+      <div class="field"><label for="fDue">End date (due)</label><input id="fDue" type="date" value="${esc(t.due)}"></div>
     </div>
+    <p class="hint" id="fSpan"></p>
+    <div class="field"><label for="fTime">Due time on the end date</label><input id="fTime" type="time" value="${esc(t.time)}"></div>
     <div class="row2">
       <div class="field"><label for="fPri">Priority</label><select id="fPri">${Object.entries(PRI).map(([k,v])=>`<option value="${k}"${t.priority===k?' selected':''}>${v}</option>`).join('')}</select></div>
       <div class="field"><label for="fRem">Remind me</label><select id="fRem">${REMIND.map(([v,l])=>`<option value="${v}"${Number(t.remind??30)===v?' selected':''}>${l}</option>`).join('')}</select></div>
@@ -236,13 +248,20 @@ function openForm(t,preset){
   const sel=document.getElementById('fDept'), nw=document.getElementById('fDeptNew'), dot=document.getElementById('fDeptDot');
   sel.addEventListener('change',()=>{const isNew=sel.value==='__new';nw.hidden=!isNew;if(isNew){nw.focus();dot.style.background='var(--muted)'}else dot.style.background=deptColor(sel.value)});
   nw.addEventListener('input',()=>{dot.style.background=nw.value.trim()?deptColor(nw.value.trim()):'var(--muted)'});
+  const fS=document.getElementById('fStart'), fD=document.getElementById('fDue'), fSpan=document.getElementById('fSpan');
+  const showSpan=()=>{const a=fS.value,b=fD.value;if(a&&b&&a<b){fSpan.textContent='Shows on every day from '+shortDate(a)+' to '+shortDate(b)+' ('+(dayDiff(a,b)+1)+' days).';fSpan.hidden=false}else{fSpan.textContent='One-day task. Pick a later end date to spread it over several days.';fSpan.hidden=false}};
+  fS.addEventListener('change',()=>{if(fS.value&&(!fD.value||fD.value<fS.value))fD.value=fS.value;showSpan()});
+  fD.addEventListener('change',()=>{if(fD.value&&fS.value>fD.value)fS.value=fD.value;showSpan()});
+  showSpan();
   document.getElementById('fName').focus();
   document.getElementById('taskForm').addEventListener('submit',e=>{
     e.preventDefault();
     const name=document.getElementById('fName').value.trim(), due=document.getElementById('fDue').value;
     const err=document.getElementById('fErr');
     if(!name){err.textContent='Give the task a name.';err.hidden=false;return}
-    if(!due){err.textContent='Pick a due date.';err.hidden=false;return}
+    if(!due){err.textContent='Pick an end date.';err.hidden=false;return}
+    const startVal=fS.value||due;
+    if(startVal>due){err.textContent='The start date must be on or before the end date.';err.hidden=false;return}
     let department=sel.value;
     if(department==='__new'){
       department=nw.value.trim();
@@ -250,7 +269,7 @@ function openForm(t,preset){
       const match=allDepts().find(d=>d.toLowerCase()===department.toLowerCase());
       if(match)department=match; else saveDepts(deptList.concat(department));
     }
-    const out=Object.assign({},t,{name,due,time:document.getElementById('fTime').value||'',department,priority:document.getElementById('fPri').value,remind:Number(document.getElementById('fRem').value),note:document.getElementById('fNote').value.trim(),snoozeUntil:null});
+    const out=Object.assign({},t,{name,due,start:startVal<due?startVal:null,time:document.getElementById('fTime').value||'',department,priority:document.getElementById('fPri').value,remind:Number(document.getElementById('fRem').value),note:document.getElementById('fNote').value.trim(),snoozeUntil:null});
     if(!editing){out.createdAt=Date.now();out.done=false}
     saveTask(out); close(); toast(editing?'Saved changes':'Added “'+name+'”');
   });
@@ -300,14 +319,15 @@ function priPill(t){return t.priority&&t.priority!=='normal'?`<span class="pill 
 function dtag(t){return `<span class="dtag"><span class="ddot" style="background:${deptColor(deptOf(t))}"></span>${esc(deptOf(t))}</span>`}
 function headHTML(title,sub,extra){return `<div class="head"><div><h1>${title}</h1><p>${sub}</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">${extra||''}<button class="btn primary" data-act="new">${ICON.plus}Add task</button></div></div>`}
 function emptyHTML(title,sub){return `<div class="empty"><b>${title}</b><span>${sub}</span><button class="btn primary sm" data-act="new">${ICON.plus}Add a task</button></div>`}
-function miniRows(list,whenFn){return `<div class="mini">${list.map(t=>`<div class="mini-row ${t.done?'done':''}"><span class="ddot" style="background:${deptColor(deptOf(t))}"></span><span class="when ${whenFn?'':'mono'}">${whenFn?esc(whenFn(t)):fmtTime(t)}</span><span class="nm" data-edit="${t.id}">${esc(t.name)}<small>${esc(deptOf(t))}${t.note?' · '+esc(t.note):''}</small></span>${priPill(t)}</div>`).join('')}</div>`}
+function miniRows(list,whenFn){return `<div class="mini">${list.map(t=>`<div class="mini-row ${t.done?'done':''}"><span class="ddot" style="background:${deptColor(deptOf(t))}"></span><span class="when ${whenFn?'':'mono'}">${whenFn?esc(whenFn(t)):fmtTime(t)}</span><span class="nm" data-edit="${t.id}">${esc(t.name)}<small>${esc(deptOf(t))}${isMulti(t)?' · '+esc(spanText(t)):''}${t.note?' · '+esc(t.note):''}</small></span>${priPill(t)}</div>`).join('')}</div>`}
 
 /* ---------- dashboard ---------- */
 function viewDashboard(){
   const now=new Date(), today=ymd(now), tmrw=ymd(addDays(now,1)), weekEnd=addDays(startOfDay(now),8);
   const open=tasks.filter(t=>!t.done).sort(sortByDue);
   const todays=tasks.filter(t=>t.due===today).sort(sortByDue);
-  const tomorrows=tasks.filter(t=>t.due===tmrw).sort(sortByDue);
+  const ongoing=tasks.filter(t=>isMulti(t)&&spansDay(t,today)&&t.due!==today).sort(sortByDue);
+  const tomorrows=tasks.filter(t=>spansDay(t,tmrw)).sort(sortByDue);
   const overdue=open.filter(isOver);
   const week=open.filter(t=>dueAt(t)>=now&&dueAt(t)<addDays(startOfDay(now),7));
   const doneWeek=tasks.filter(t=>t.done&&t.doneAt&&t.doneAt>addDays(now,-7).getTime());
@@ -318,6 +338,7 @@ function viewDashboard(){
   const important=open.filter(t=>t.priority==='urgent'||t.priority==='high').slice(0,5);
 
   const items=todays.map(t=>({at:dueAt(t),html:`<div class="slot ${t.done?'done':isOver(t)?'over':''}" style="--dc:${deptColor(deptOf(t))}"><span class="t">${fmtTime(t)}</span><span class="rail-dot"><i></i></span><div><div class="nm" data-edit="${t.id}">${esc(t.name)} ${priPill(t)}</div><div class="sub">${esc(deptOf(t))} · ${t.done?'Done':isOver(t)?'Overdue':untilText(dueAt(t)-now)}${t.note?' · '+esc(t.note):''}</div></div></div>`}))
+    .concat(ongoing.map(t=>({at:startOfDay(now),html:`<div class="slot ${t.done?'done':''}" style="--dc:${deptColor(deptOf(t))}"><span class="t">${dayOfText(t,today).replace(' of ','/').replace('Day ','Day ')}</span><span class="rail-dot"><i></i></span><div><div class="nm" data-edit="${t.id}">${esc(t.name)} ${priPill(t)}</div><div class="sub">${esc(deptOf(t))} · ${dayOfText(t,today)} · due ${esc(fmtDue(t))}</div></div></div>`})))
     .concat(gOn(today).map(e=>({at:e.allDay?startOfDay(now):new Date(e.date+'T'+e.time+':00'),html:`<div class="slot gslot"><span class="t">${e.allDay?'All day':fmtTime(e)}</span><span class="rail-dot"><i></i></span><div><div class="nm"><a href="${esc(e.link)}" target="_blank" rel="noopener" data-glink>${esc(e.title)}</a></div><div class="sub">Google Calendar</div></div></div>`})))
     .sort((a,b)=>a.at-b.at);
   let agenda='';
@@ -349,7 +370,7 @@ function viewDashboard(){
     <div class="col">
       <section class="panel"><h2 class="eyebrow"><span>Today</span><a href="#tasks" data-goday="${today}">Open day</a></h2><div class="agenda">${agenda}</div></section>
       <section class="panel"><h2 class="eyebrow"><span>Tomorrow</span><a href="#tasks" data-goday="${tmrw}">Open day</a></h2>
-        ${tomorrows.length||gTmrw?(tomorrows.length?miniRows(tomorrows):'')+(gTmrw?`<div class="mini">${gTmrw}</div>`:''):'<p class="quiet">Nothing due tomorrow yet.</p>'}</section>
+        ${tomorrows.length||gTmrw?(tomorrows.length?miniRows(tomorrows,t=>t.due===tmrw?fmtTime(t):startOf(t)===tmrw?'Starts':dayOfText(t,tmrw)):'')+(gTmrw?`<div class="mini">${gTmrw}</div>`:''):'<p class="quiet">Nothing due tomorrow yet.</p>'}</section>
       <section class="panel"><h2 class="eyebrow"><span>Coming up · next 7 days</span><a href="#tasks" data-goview="week">Open week</a></h2>
         ${comingUp.length?miniRows(comingUp,t=>relDay(t.due)):'<p class="quiet">Nothing else due this week.</p>'}</section>
     </div>
@@ -367,7 +388,7 @@ function viewDashboard(){
 function visibleTasks(){return tasks.filter(t=>deptFilter==='all'||deptOf(t)===deptFilter)}
 function calTitle(){
   if(calView==='month')return calDate.toLocaleDateString(undefined,{month:'long',year:'numeric'});
-  if(calView==='week'){const s=addDays(calDate,-calDate.getDay()),e=addDays(s,6);return s.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' – '+e.toLocaleDateString(undefined,{month:s.getMonth()===e.getMonth()?undefined:'short',day:'numeric',year:'numeric'})}
+  if(calView==='week'){const s=addDays(calDate,-calDate.getDay()),e=addDays(s,6),mo=d=>d.toLocaleDateString(undefined,{month:'short'});return s.getMonth()===e.getMonth()?`${mo(s)} ${s.getDate()} – ${e.getDate()}, ${e.getFullYear()}`:`${mo(s)} ${s.getDate()} – ${mo(e)} ${e.getDate()}, ${e.getFullYear()}`}
   if(calView==='day')return calDate.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
   return 'By department';
 }
@@ -387,28 +408,45 @@ function viewTasks(){
   else body=listHTML(vt);
   return `${headHTML('Tasks','Click a date to open it, or an empty spot to add a task there.',`<button class="btn" data-managedepts>Departments</button>`)}${bar}${chips}${body}`;
 }
+function laneUp(items){const lanes=[];items.forEach(b=>{let i=lanes.findIndex(end=>end<b.s);if(i<0){i=lanes.length;lanes.push(-1)}lanes[i]=b.e;b.lane=i});return lanes.length}
+function spanBars(list,keys){
+  const k0=keys[0], kN=keys[keys.length-1];
+  return list.filter(t=>isMulti(t)&&startOf(t)<=kN&&t.due>=k0)
+    .sort((a,b)=>startOf(a).localeCompare(startOf(b))||dayCount(b)-dayCount(a))
+    .map(t=>({t,s:startOf(t)<k0?0:keys.indexOf(startOf(t)),e:t.due>kN?keys.length-1:keys.indexOf(t.due),cl:startOf(t)<k0,cr:t.due>kN}));
+}
+function barHTML(b,row,extra){
+  const t=b.t;
+  return `<button class="mbar ${b.cl?'cl':''} ${b.cr?'cr':''} ${t.done?'done':''}" style="grid-column:${b.s+1}/${b.e+2};grid-row:${row};--dc:${deptColor(deptOf(t))}${extra||''}" data-edit="${t.id}" title="${esc(t.name)} · ${esc(spanText(t))} · due ${esc(fmtDue(t))}"><span>${b.cl?'← ':''}${esc(t.name)}</span>${!b.cr&&t.time?`<em>due ${fmtShort(t)}</em>`:!b.cr?'<em>due</em>':''}</button>`;
+}
 function monthHTML(vt){
   const first=new Date(calDate.getFullYear(),calDate.getMonth(),1);
   const start=addDays(first,-first.getDay());
   const last=new Date(calDate.getFullYear(),calDate.getMonth()+1,0);
   const weeks=Math.ceil((first.getDay()+last.getDate())/7);
-  const today=ymd(new Date());
-  let cells='';
-  for(let i=0;i<weeks*7;i++){
-    const d=addDays(start,i), key=ymd(d);
-    const tItems=vt.filter(t=>t.due===key).map(t=>({ad:!t.time,m:t.time?gMins(t.time):0,html:t.time
+  const today=ymd(new Date()), MAXL=3;
+  let html='';
+  for(let w=0;w<weeks;w++){
+    const ws=addDays(start,w*7), keys=[...Array(7)].map((_,i)=>ymd(addDays(ws,i)));
+    const bars=spanBars(vt,keys), nl=laneUp(bars), shownL=Math.min(nl,MAXL);
+    let cells='', tops='', lists='', barsHTML='';
+    keys.forEach((key,i)=>{
+      const d=addDays(ws,i);
+      cells+=`<div class="mc ${d.getMonth()!==calDate.getMonth()?'out':''} ${key===today?'today':''}" style="grid-column:${i+1}" data-addday="${key}"></div>`;
+      tops+=`<div class="mc-top" style="grid-column:${i+1}" data-addday="${key}"><button class="mc-num ${key===today?'is-today':''}" data-goday="${key}" aria-label="Open ${d.toDateString()}">${d.getDate()}</button></div>`;
+      const tItems=vt.filter(t=>t.due===key&&!isMulti(t)).map(t=>({ad:!t.time,m:t.time?gMins(t.time):0,html:t.time
         ?`<button class="mc-ev ${t.done?'done':''}" data-edit="${t.id}"><span class="ddot" style="background:${deptColor(deptOf(t))}"></span><em>${fmtShort(t)}</em><span>${esc(t.name)}</span></button>`
         :`<button class="mc-ev allday ${t.done?'done':''}" style="--dc:${deptColor(deptOf(t))}" data-edit="${t.id}"><span>${esc(t.name)}</span></button>`}));
-    const gItems=gOn(key).map(e=>({ad:e.allDay,m:e.allDay?0:gMins(e.time),html:e.allDay?gLink(e,'mc-ev allday',`<span>${esc(e.title)}</span>`):gLink(e,'mc-ev',`<span class="ddot"></span><em>${fmtShort(e)}</em><span>${esc(e.title)}</span>`)}));
-    const list=tItems.concat(gItems).sort((a,b)=>(b.ad-a.ad)||(a.m-b.m));
-    const shown=list.slice(0,3), more=list.length-shown.length;
-    cells+=`<div class="mc ${d.getMonth()!==calDate.getMonth()?'out':''} ${key===today?'today':''}" data-addday="${key}">
-      <button class="mc-num" data-goday="${key}" aria-label="Open ${d.toDateString()}">${d.getDate()}</button>
-      ${shown.map(x=>x.html).join('')}
-      ${more>0?`<button class="mc-more" data-goday="${key}">+${more} more</button>`:''}
-    </div>`;
+      const gItems=gOn(key).map(e=>({ad:e.allDay,m:e.allDay?0:gMins(e.time),html:e.allDay?gLink(e,'mc-ev allday',`<span>${esc(e.title)}</span>`):gLink(e,'mc-ev',`<span class="ddot"></span><em>${fmtShort(e)}</em><span>${esc(e.title)}</span>`)}));
+      const singles=tItems.concat(gItems).sort((a,b)=>(b.ad-a.ad)||(a.m-b.m));
+      const hiddenBars=bars.filter(b=>b.lane>=MAXL&&b.s<=i&&i<=b.e).length;
+      const cap=Math.max(1,3-shownL), shown=singles.slice(0,cap), more=singles.length-shown.length+hiddenBars;
+      lists+=`<div class="mc-list" style="grid-column:${i+1};grid-row:${shownL+2}" data-addday="${key}">${shown.map(x=>x.html).join('')}${more>0?`<button class="mc-more" data-goday="${key}">+${more} more</button>`:''}</div>`;
+    });
+    bars.filter(b=>b.lane<MAXL).forEach(b=>{barsHTML+=barHTML(b,b.lane+2)});
+    html+=`<div class="mweek" style="grid-template-rows:auto${shownL?` repeat(${shownL},24px)`:''} 1fr">${cells}${tops}${barsHTML}${lists}</div>`;
   }
-  return `<div class="month"><div class="mhead">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div>${x}</div>`).join('')}</div><div class="mgrid">${cells}</div></div>`;
+  return `<div class="month"><div class="mhead">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div>${x}</div>`).join('')}</div><div class="mweeks" id="mweeks">${html}</div></div>`;
 }
 function layoutDay(list,gl){
   const evs=list.filter(t=>t.time).map(t=>{const s=gMins(t.time);return {t,s,e:Math.min(s+60,1440)}})
@@ -424,12 +462,24 @@ function gridHTML(vt,cols,startDate){
   const s=startDate||addDays(calDate,-calDate.getDay());
   const days=[...Array(cols)].map((_,i)=>addDays(s,i));
   const now=new Date(), today=ymd(now), H=48;
-  let head=`<div class="tg-corner"></div>`, ad=`<div class="tg-ad-label">all day</div>`, colsHTML='';
+  const keys=days.map(ymd);
+  let head=`<div class="tg-corner"></div>`, colsHTML='';
+  const adBars=spanBars(vt,keys);
+  const adSingles=[];
+  keys.forEach((k,i)=>{
+    vt.filter(t=>t.due===k&&!isMulti(t)&&!t.time).forEach(t=>adSingles.push({s:i,e:i,t}));
+    gOn(k).filter(e=>e.allDay).forEach(e=>adSingles.push({s:i,e:i,g:e}));
+  });
+  const adAll=adBars.concat(adSingles), nAd=laneUp(adAll);
+  const adCells=keys.map((k,i)=>`<div class="tg-adcell" style="grid-column:${i+1}"></div>`).join('');
+  const adItems=adAll.map(b=>b.g?gLink(b.g,'mbar gbar',`<span>${esc(b.g.title)}</span>`).replace('class="mbar gbar g"',`class="mbar gbar g" style="grid-column:${b.s+1}/${b.e+2};grid-row:${b.lane+1}"`)
+    :b.t&&!isMulti(b.t)?`<button class="mbar ${b.t.done?'done':''}" style="grid-column:${b.s+1};grid-row:${b.lane+1};--dc:${deptColor(deptOf(b.t))}" data-edit="${b.t.id}"><span>${esc(b.t.name)}</span></button>`
+    :barHTML(b,b.lane+1)).join('');
+  const ad=`<div class="tg-ad-label">all day</div><div class="tg-adrow" style="grid-column:span ${keys.length};grid-template-columns:repeat(${keys.length},minmax(0,1fr));grid-template-rows:repeat(${Math.max(1,nAd)},24px)">${adCells}${adItems}</div>`;
   days.forEach(d=>{
-    const key=ymd(d), list=vt.filter(t=>t.due===key);
+    const key=ymd(d), list=vt.filter(t=>t.due===key&&!isMulti(t));
     head+=`<div class="tg-h ${key===today?'today':''}"><span>${d.toLocaleDateString(undefined,{weekday:'short'})}</span><button data-goday="${key}" aria-label="Open ${d.toDateString()}">${d.getDate()}</button></div>`;
     const gl=gOn(key);
-    ad+=`<div class="tg-ad">${list.filter(t=>!t.time).map(t=>`<button class="mc-ev allday ${t.done?'done':''}" style="--dc:${deptColor(deptOf(t))}" data-edit="${t.id}"><span>${esc(t.name)}</span></button>`).join('')}${gl.filter(e=>e.allDay).map(e=>gLink(e,'mc-ev allday',`<span>${esc(e.title)}</span>`)).join('')}</div>`;
     const evs=layoutDay(list,gl);
     let inner=evs.map(ev=>{const w=100/ev.lanes;const pos=`top:${ev.s/60*H}px;height:${Math.max((ev.e-ev.s)/60*H-2,22)}px;left:calc(${ev.lane*w}% + 2px);width:calc(${w}% - 4px);right:auto`;
       if(ev.g)return `<a class="tg-ev g" style="${pos}" href="${esc(ev.g.link)}" target="_blank" rel="noopener" data-glink><b>${esc(ev.g.title)}</b><small>${fmtTime(ev.g)} · Google</small></a>`;
@@ -441,10 +491,10 @@ function gridHTML(vt,cols,startDate){
   return `<div class="tg-wrap"><div class="tg-scroll" id="tgScroll"><div class="tg" style="--cols:${cols};--minw:${cols>1?'760px':'0'}">${head}${ad}${gut}${colsHTML}</div></div></div>`;
 }
 function dayHTML(vt){
-  const key=ymd(calDate), list=vt.filter(t=>t.due===key).sort(sortByDue);
+  const key=ymd(calDate), list=vt.filter(t=>spansDay(t,key)).sort((a,b)=>(isMulti(b)-isMulti(a))||sortByDue(a,b));
   return `<div class="dayview">${gridHTML(vt,1,calDate)}
     <section class="panel"><h2 class="eyebrow"><span>${esc(relDay(key))}</span><span>${list.length} task${list.length===1?'':'s'}</span></h2>
-      ${list.length?list.map(t=>`<div class="mini-row ${t.done?'done':''}"><span class="ddot" style="background:${deptColor(deptOf(t))}"></span><span class="when mono">${fmtTime(t)}</span><span class="nm" data-edit="${t.id}">${esc(t.name)}<small>${esc(deptOf(t))}${t.note?' · '+esc(t.note):''}</small></span><button class="icon-btn sm ${t.done?'':'ok'}" data-done="${t.id}" aria-label="${t.done?'Mark not done':'Mark done'}">${t.done?ICON.undo:ICON.check}</button></div>`).join(''):'<p class="quiet">Nothing on this day. Click a time on the left to add a task at that hour.</p>'}
+      ${list.length?list.map(t=>`<div class="mini-row ${t.done?'done':''}"><span class="ddot" style="background:${deptColor(deptOf(t))}"></span><span class="when mono">${isMulti(t)&&t.due!==key?esc(dayOfText(t,key)):fmtTime(t)}</span><span class="nm" data-edit="${t.id}">${esc(t.name)}<small>${esc(deptOf(t))}${isMulti(t)?' · '+esc(spanText(t))+' · due '+esc(fmtDue(t)):''}${t.note?' · '+esc(t.note):''}</small></span><button class="icon-btn sm ${t.done?'':'ok'}" data-done="${t.id}" aria-label="${t.done?'Mark not done':'Mark done'}">${t.done?ICON.undo:ICON.check}</button></div>`).join(''):'<p class="quiet">Nothing on this day. Click a time on the left to add a task at that hour.</p>'}
       ${gOn(key).map(e=>`<div class="mini-row"><span class="ddot" style="background:transparent;border:2px solid var(--gcal);border-radius:50%"></span><span class="when mono">${e.allDay?'All day':fmtTime(e)}</span><span class="nm"><a href="${esc(e.link)}" target="_blank" rel="noopener" data-glink style="color:inherit;text-decoration:none">${esc(e.title)}</a><small>Google Calendar</small></span></div>`).join('')}
       <button class="btn sm" data-addday="${key}" style="align-self:flex-start">${ICON.plus}Add to this day</button>
     </section></div>`;
@@ -452,11 +502,12 @@ function dayHTML(vt){
 function gtag(t){if(!google.connected)return '';if(t.gcalErr)return `<span class="gtag err" title="${esc(t.gcalErr)}">Not in Google Calendar</span>`;return t.gcalId?`<span class="gtag">${ICON.google}In Google Calendar</span>`:''}
 function taskCard(t){
   const now=new Date(), over=isOver(t);
-  const state=t.done?'<span class="pill done">Done</span>':over?'<span class="pill over">Overdue</span>':'<span class="pill when">'+esc(relDay(t.due))+'</span>';
+  const tk=ymd(now), inProg=isMulti(t)&&spansDay(t,tk)&&t.due!==tk;
+  const state=t.done?'<span class="pill done">Done</span>':over?'<span class="pill over">Overdue</span>':inProg?'<span class="pill when">'+esc(dayOfText(t,tk))+'</span>':(isMulti(t)&&startOf(t)>tk)?'<span class="pill when">Starts '+esc(relDay(startOf(t)))+'</span>':'<span class="pill when">'+esc(relDay(t.due))+'</span>';
   return `<article class="card ${t.done?'is-done':''}" style="--dc:${deptColor(deptOf(t))}">
     <div class="info"><div class="top"><b>${esc(t.name)}</b>${state}${priPill(t)}${dtag(t)}${gtag(t)}</div>
       ${t.note?`<div class="note">${esc(t.note)}</div>`:''}
-      <div class="meta">Due: <strong>${esc(parseDay(t.due).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))}</strong> · Time: <strong class="mono">${fmtTime(t)}</strong>${!t.done?' · '+untilText(dueAt(t)-now):''}</div></div>
+      <div class="meta">${isMulti(t)?`Start: <strong>${esc(shortDate(startOf(t)))}</strong> · End: <strong>${esc(parseDay(t.due).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))}</strong> (${dayCount(t)} days)`:`Due: <strong>${esc(parseDay(t.due).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}))}</strong>`} · Time: <strong class="mono">${fmtTime(t)}</strong>${!t.done?' · '+untilText(dueAt(t)-now):''}</div></div>
     <div class="acts">
       ${!t.done?`<button class="btn sm" data-tmrw="${t.id}">${ICON.cal}Tomorrow</button>`:''}
       <button class="icon-btn" data-edit="${t.id}" aria-label="Edit ${esc(t.name)}">${ICON.edit}</button>
@@ -476,8 +527,8 @@ function listHTML(vt){
 /* ---------- notifications ---------- */
 function notifHTML(n){
   const t=n.t, ico=n.kind==='overdue'?ICON.alert:n.kind==='soon'?ICON.clock:ICON.bell;
-  const head={overdue:'Overdue',soon:'Due soon',today:'Due today',upcoming:'Coming up'}[n.kind];
-  const sub=n.kind==='overdue'?'Was due '+fmtDue(t).toLowerCase()+' · '+untilText(n.ms):head+' · '+fmtDue(t)+' · '+untilText(n.ms);
+  const head={overdue:'Overdue',soon:'Due soon',today:'Due today',starts:'Starts today',upcoming:'Coming up'}[n.kind];
+  const sub=n.kind==='starts'?'Starts today · '+spanText(t)+' · due '+fmtDue(t):n.kind==='overdue'?'Was due '+fmtDue(t).toLowerCase()+' · '+untilText(n.ms):head+' · '+fmtDue(t)+' · '+untilText(n.ms);
   return `<div class="notif ${n.kind}"><span class="ico">${ico}</span><div class="txt"><b>${esc(t.name)}</b><span>${esc(deptOf(t))} · ${esc(sub)}</span></div>
     <div class="acts"><button class="btn sm" data-done="${t.id}">${ICON.check}Done</button>${n.kind!=='upcoming'?`<button class="btn sm" data-snooze="${t.id}">Snooze 1 hr</button>`:''}<button class="btn sm" data-dismiss="${esc(n.key)}">Dismiss</button></div></div>`;
 }
@@ -485,7 +536,7 @@ function viewNotifications(){
   const n=computeNotifs();
   const g=k=>n.filter(x=>x.kind===k);
   const sec=(title,items)=>items.length?`<section class="ngroup"><h2 class="eyebrow"><span>${title}</span><span>${items.length}</span></h2>${items.map(notifHTML).join('')}</section>`:'';
-  const body=sec('Overdue',g('overdue'))+sec('Due soon',g('soon'))+sec('Later today',g('today'))+sec('Tomorrow and soon after',g('upcoming'));
+  const body=sec('Overdue',g('overdue'))+sec('Due soon',g('soon'))+sec('Starting today',g('starts'))+sec('Later today',g('today'))+sec('Tomorrow and soon after',g('upcoming'));
   return `${headHTML('Notifications','Reminders follow each task’s “Remind me” setting while this page is open.')}
   ${body||`<div class="empty"><b>You're all caught up</b><span>When a task gets close to its due time, a reminder shows up here and pops up in the corner.</span></div>`}`;
 }
@@ -602,6 +653,17 @@ function openSettings(){
   };
   draw();
 }
+
+/* drag across days in month view to make a multi-day task */
+(function(){
+  let from=null, to=null, dragging=false, suppress=false;
+  const keyAt=(x,y)=>{const el=document.elementFromPoint(x,y);const c=el&&el.closest('.mweeks [data-addday]');return c?c.dataset.addday:null};
+  const paint=()=>{const a=from<to?from:to,b=from<to?to:from;document.querySelectorAll('.mweeks .mc').forEach(c=>c.classList.toggle('sel',dragging&&c.dataset.addday>=a&&c.dataset.addday<=b))};
+  document.addEventListener('pointerdown',e=>{if(e.button!==0||e.pointerType==='touch')return;if(e.target.closest('button,a'))return;const k=keyAt(e.clientX,e.clientY);if(!k)return;from=to=k;dragging=false});
+  document.addEventListener('pointermove',e=>{if(!from)return;const k=keyAt(e.clientX,e.clientY);if(k&&k!==to){to=k;dragging=from!==to;paint()}});
+  document.addEventListener('pointerup',()=>{if(!from)return;if(dragging){const a=from<to?from:to,b=from<to?to:from;suppress=true;setTimeout(()=>{suppress=false},50);openForm(null,{start:a,due:b})}from=to=null;dragging=false;paint()});
+  document.addEventListener('click',e=>{if(suppress){e.stopPropagation();e.preventDefault();suppress=false}},true);
+})();
 
 function route(){
   let h=(location.hash||'').slice(1);

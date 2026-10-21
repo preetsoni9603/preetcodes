@@ -3,7 +3,8 @@
 Preet's personal day planner at **preetcodes.com/mycalendar**.
 
 - **Dashboard:** Today, Tomorrow, Coming up (7 days), Important deadlines, Reminders, Next up.
-- **Tasks:** Month, Week, Day and List views like Google Calendar. Click a date to open it, or an empty spot or hour to add a task there. Every task has a Name, Department, Due date, Time, Priority, a "Remind me" time and a note.
+- **Tasks:** Month, Week, Day and List views like Google Calendar. Click a date to open it, or an empty spot or hour to add a task there. Every task has a Name, Department, Start date, End (due) date, Time, Priority, a "Remind me" time and a note.
+- **Multi-day tasks:** give a task a Start date before its End date, or drag across days in Month view, and it shows as a bar on every day of that period. The dashboard shows "Day 3 of 5" while it's running.
 - **Departments:** School, Work, Personal and Job Search to start. Add, rename or remove them under Tasks → Departments.
 - **Google Calendar sync:** tasks are copied to your primary Google Calendar with a reminder, so Google sends alerts to your phone and laptop. Your Google events also show in the planner.
 - **Private:** password protected. Tasks are stored on your server, so every device you sign in on sees the same list.
@@ -49,6 +50,7 @@ Your server needs PHP's **curl** extension. Most cPanel hosts have it on. If Set
 ### What gets synced
 
 - Each task becomes an event titled `[Department] Task name` on its due date and time (30 minutes long). A task with no time becomes an all-day event.
+- A multi-day task also gets an all-day event across every day from start to end, so it shows on each day in Google Calendar too. That event reminds you at 5 PM the evening before it starts. The due-date event (titled `Due: …`) reminds you before the deadline.
 - The task's **Remind me** setting becomes the event's popup reminder. All-day tasks remind you at 5 PM the evening before.
 - Urgent tasks are red in Google Calendar, High tasks are orange, and others are blue.
 - Finishing a task adds ✓ to the title and turns off its reminder. Deleting a task deletes its event.
